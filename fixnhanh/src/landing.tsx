@@ -2,6 +2,9 @@ import { Hono } from 'hono';
 import { jsx } from 'hono/jsx';
 import type { Env } from './types';
 
+/** @jsx jsx */
+/** @jsxImportSource hono/jsx */
+
 export const landing = new Hono<{ Bindings: Env }>();
 landing.get('/', async (c) => {
   const services = await c.env.DB.prepare('SELECT * FROM services WHERE active = 1').all();

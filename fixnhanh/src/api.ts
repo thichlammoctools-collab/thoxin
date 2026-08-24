@@ -43,7 +43,7 @@ app.post('/login', async (c) => {
   if (!user) return c.json({ error: 'Invalid credentials' }, 401);
   const pw = await c.env.DB.prepare('SELECT hash FROM passwords WHERE user_id = ?').bind(user.id).first();
   if (!pw) return c.json({ error: 'Invalid credentials' }, 401);
-  const ok = await verifyPassword(password, pw.hash as string);
+  const ok = await verifyPassword(password, pw.hash as string, c.env.JWT_SECRET.startsWith('dev-'));
   if (!ok) return c.json({ error: 'Invalid credentials' }, 401);
   const token = await signToken({ sub: user.id, phone: user.phone, role: user.role }, c.env.JWT_SECRET);
   return c.json({ token, user: { id: user.id, phone: user.phone, name: user.name, role: user.role, avatar_url: user.avatar_url } });
@@ -233,7 +233,8 @@ app.post('/bookings/:id/status', async (c) => {
   if (!booking) return c.json({ error: 'Not found' }, 404);
   if (booking.worker_id !== user.id) return c.json({ error: 'Forbidden' }, 403);
   const body = await c.req.json<{ status: string }>();
-  const valid = ['arrived', 'in_progress', 'done'];
+  // Phải khớp CHECK(status IN ...) trong schema.sql
+  const valid = ['finding', 'offered', 'accepted', 'in_progress', 'done', 'paid', 'cancelled'];
   if (!valid.includes(body.status)) return c.json({ error: 'Invalid status' }, 400);
   await c.env.DB.prepare('UPDATE bookings SET status = ? WHERE id = ?').bind(body.status, id).run();
   return c.json({ ok: true });
@@ -627,8 +628,10 @@ app.post('/uploads', async (c) => {
   return c.json({ key }, 201);
 });
 
-app.get('/photos/:key', async (c) => {
-  const key = c.req.param('key');
+app.get('/photos/*', async (c) => {
+  // Key dạng "uploads/..." — lấy toàn bộ phần sau /photos/
+  const key = c.req.path.replace(/^\/photos\//, '');
+  if (!key) return c.json({ error: 'Not found' }, 404);
   const obj = await c.env.PHOTOS.get(key);
   if (!obj) return c.json({ error: 'Not found' }, 404);
   return new Response(obj.body, { headers: { 'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream' } });

@@ -9,14 +9,8 @@ const app = new Hono<{ Bindings: Env }>();
 app.route('/', landing);
 app.route('/api', api);
 
-app.get('/api/ws/chat/:id', async (c) => {
-  const id = c.req.param('id');
-  const stub = c.env.CHAT.get(c.env.CHAT.idFromName(id));
-  return stub.fetch(c.req.raw);
-});
-
-app.get('/api/photos/:key', async (c) => {
-  const key = c.req.param('key');
+app.get('/photos/*', async (c) => {
+  const key = c.req.path.replace(/^\/photos\//, '');
   try {
     const obj = await c.env.PHOTOS.get(key);
     if (!obj) return c.notFound();
