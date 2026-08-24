@@ -14,12 +14,12 @@ export type Message = { id: string; conversation_id: string; sender_id: string; 
 export type Notification = { id: string; user_id: string; type: string; title: string; body: string; payload: string; read_at?: string; created_at: string };
 export type Review = { id: string; order_id: string; author_id: string; target_user_id: string; rating: number; comment: string; created_at: string };
 
-export function row<T>(r: D1Result<T>): T | undefined {
-  return r.results?.[0];
+export function row<T>(r: D1Result<T> | null): T | undefined {
+  return r?.results?.[0];
 }
 
-export function rows<T>(r: D1Result<T>): T[] {
-  return r.results || [];
+export function rows<T>(r: D1Result<T> | null): T[] {
+  return r?.results || [];
 }
 
 export async function getUserByPhone(db: D1Database, phone: string): Promise<User | undefined> {

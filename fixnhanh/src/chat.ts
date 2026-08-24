@@ -32,7 +32,7 @@ export class ChatDO extends DurableObject<Env> {
       const parsed = JSON.parse(message) as { body?: string };
       if (!parsed.body) return;
       const conversationId = this.ctx.id.name || '';
-      const att = ws.deserializeAttachment<ChatAttachment>();
+      const att = ws.deserializeAttachment() as ChatAttachment | null;
       const userId = att?.userId || '';
       const msgId = genId('msg');
       const createdAt = new Date().toISOString();
