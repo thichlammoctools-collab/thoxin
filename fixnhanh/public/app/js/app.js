@@ -125,16 +125,17 @@ routes['*']=async()=>shell(`<div style="text-align:center;padding:48px 16px"><di
 
 async function renderRoute(){
   const hash=location.hash||'#/home';
-  const path=hash.split('')[0];
-  let fn=routes[path];
+  const path=hash.split('?')[0];
+  let fn=routes[path],arg=null;
   if(!fn){
-    const m=hash.match(/^#\/jobs\/([^\/]+)$/);if(m){fn=routes['/jobs/:id'];return fn(m[1]);}
-    const o=hash.match(/^#\/orders\/([^\/]+)$/);if(o){fn=routes['/orders/:id'];return fn(o[1]);}
-    const c=hash.match(/^#\/chat\/([^\/]+)$/);if(c){fn=routes['/chat/:id'];return fn(c[1]);}
-    fn=routes['*'];
+    let m;
+    if((m=hash.match(/^#\/jobs\/([^\/]+)$/))){fn=routes['/jobs/:id'];arg=m[1];}
+    else if((m=hash.match(/^#\/orders\/([^\/]+)$/))){fn=routes['/orders/:id'];arg=m[1];}
+    else if((m=hash.match(/^#\/chat\/([^\/]+)$/))){fn=routes['/chat/:id'];arg=m[1];}
+    else fn=routes['*'];
   }
   try{
-    const html=await fn();
+    const html=await fn(arg);
     $('#app').innerHTML=html;
     bindEvents();
   }catch(e){
