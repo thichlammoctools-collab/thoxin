@@ -560,24 +560,34 @@ app.post('/conversations/:id/messages', async (c) => {
   const otherParty = (convo as any).customer_id === user.id ? (convo as any).worker_id : (convo as any).customer_id;
   await c.env.DB.prepare('INSERT INTO notifications (id, user_id, type, title, body, payload) VALUES (?, ?, "message", "Tin nhắn mới", ?, ?)')
     .bind(genId('notif'), otherParty, body.body.slice(0, 100), JSON.stringify({ conversation_id: id })).run();
+  // Fan-out realtime tới các socket đang mở trong phòng chat (nếu có)
+  try {
+    const doStub = c.env.CHAT.get(c.env.CHAT.idFromName(id));
+    await doStub.broadcastMessage({ id: msgId, conversationId: id, senderId: user.id, body: body.body, attachmentUrl: body.attachment_url || null, created_at: ts });
+  } catch (e) {
+    console.error('chat broadcast failed', e);
+  }
   return c.json({ id: msgId }, 201);
 });
 
 app.get('/ws/chat/:conversationId', async (c) => {
   const id = c.req.param('conversationId');
+  const upgrade = (c.req.header('Upgrade') || '').toLowerCase();
+  if (upgrade !== 'websocket') return c.json({ error: 'Expected websocket' }, 426);
   const url = new URL(c.req.url);
   const token = url.searchParams.get('token');
   if (!token) return c.json({ error: 'Missing token' }, 400);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
-  if (!payload) return c.json({ error: 'Unauthorized' }, 401);
-  const pair = new WebSocketPair();
-  const [client, server] = Object.values(pair);
-  server.accept();
-  server.serializeOptions = { maxDuration: 0 };
-  const id_ = c.env.CHAT.idFromName(id);
-  const doStub = c.env.CHAT.get(id_);
-  await doStub.acceptWebSocket(server);
-  return c.json({ ok: true });
+  if (!payload?.sub) return c.json({ error: 'Unauthorized' }, 401);
+  // Chỉ thành viên của conversation mới được kết nối
+  const convo = await c.env.DB.prepare('SELECT * FROM conversations WHERE id = ?').bind(id).first() as any;
+  if (!convo) return c.json({ error: 'Not found' }, 404);
+  if (convo.customer_id !== payload.sub && convo.worker_id !== payload.sub) return c.json({ error: 'Forbidden' }, 403);
+  const doId = c.env.CHAT.idFromName(id);
+  const doStub = c.env.CHAT.get(doId);
+  // Forward request gốc (kèm header định danh) tới DO — DO trả response 101
+  const req = new Request(c.req.raw, { headers: new Headers([...c.req.raw.headers, ['X-Chat-User', String(payload.sub)]]) });
+  return doStub.fetch(req);
 });
 
 // ==================== NOTIFICATIONS ====================
