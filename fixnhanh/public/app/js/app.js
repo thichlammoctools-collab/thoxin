@@ -24,7 +24,8 @@ function toast(msg){const t=document.createElement('div');t.className='toast sho
 function statusColor(s){const m={active:'#10B981',blocked:'#EF4444',finding:'#F59E0B',offered:'#0B6CFF',accepted:'#10B981',in_progress:'#0B6CFF',done:'#10B981',paid:'#10B981',cancelled:'#EF4444',open:'#0B6CFF',assigned:'#0B6CFF',completed:'#10B981',delivered:'#10B981',awaiting_payment:'#F59E0B',held:'#F59E0B',released:'#10B981',refunded:'#EF4444',pending:'#F59E0B',rejected:'#EF4444'};return m[s]||'#6B7280';}
 
 async function api(path,opts={}){
-  const h={'Content-Type':'application/json',...(opts.headers||{})};
+  const isFormData = opts.body instanceof FormData;
+  const h = { ...(isFormData ? {} : {'Content-Type':'application/json'}), ...(opts.headers||{}) };
   if(state.token)h['Authorization']=`Bearer ${state.token}`;
   const res=await fetch(`${API_BASE}${path}`,{...opts,headers:h});
   if(res.status===401){logout();throw new Error('Unauthorized');}
@@ -58,7 +59,16 @@ routes['/home']=async()=>{
     const bk=await api('/bookings?mine=1');const j=await api('/jobs?status=open');
     h+=`<h2 style="margin:0 0 12px">Lịch đặt</h2>`;
     if(!bk.length)h+=`<p style="color:var(--muted)">Chưa có lịch đặt</p>`;
-    bk.forEach(b=>h+=`<a href="#/orders/${b.related_order||''}" class="card" style="display:block;text-decoration:none;color:inherit"><div style="font-weight:700">${esc(b.address)}</div><div style="font-size:12px;color:var(--muted)">${DISTRICTS[b.district]||b.district}·${fmtDate(b.scheduled_at)}·<span style="color:${statusColor(b.status)}">${b.status}</span></div></a>`);
+    bk.forEach(b=>{
+      const canRespond = b.worker_id===state.user.id && b.status==='offered';
+      const canClaim = b.status==='finding';
+      h+=`<div class="card" style="padding:12px">
+        <div style="font-weight:700">${esc(b.address)} · ${DISTRICTS[b.district]||b.district}</div>
+        <div style="font-size:12px;color:var(--muted)">${fmtDate(b.scheduled_at)} · <span style="color:${statusColor(b.status)}">${b.status}</span></div>
+        ${canRespond?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary accept-booking-btn" data-id="${b.id}" style="flex:1;padding:8px">Nhận</button><button class="btn btn-outline decline-booking-btn" data-id="${b.id}" style="flex:1;padding:8px">Từ chối</button></div>`:''}
+        ${canClaim?`<button class="btn btn-primary claim-booking-btn" data-id="${b.id}" style="margin-top:8px;width:100%;padding:8px">Nhận lịch này</button>`:''}
+      </div>`;
+    });
     h+=`<h2 style="margin:24px 0 12px">Việc mới</h2>`;
     if(!j.length)h+=`<p style="color:var(--muted)">Không có việc mới</p>`;
     j.forEach(x=>h+=`<a href="#/jobs/${x.id}" class="card" style="display:block;text-decoration:none;color:inherit"><div style="font-weight:700">${esc(x.title)}</div><div style="font-size:12px;color:var(--muted)">${fmt(x.budget_min)}-${fmt(x.budget_max)}·${DISTRICTS[x.district]||x.district}</div></a>`);
@@ -108,7 +118,7 @@ routes['/profile-edit']=async()=>{let wp={bio:'',skills:[],districts:[],years_ex
 routes['/become-worker']=async()=>{return shell(`<form id="becomeForm"><p style="color:var(--muted);margin-bottom:16px">Điền thông tin để trở thành thợ và nhận việc trên FixNhanh.</p><textarea class="input" name="bio" rows="3" placeholder="Giới thiệu bản thân..." required></textarea><label style="font-size:12px;color:var(--muted)">Kỹ năng</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">${Object.entries(SKILLS).map(([k,v])=>`<label style="display:flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" name="skills" value="${k}"/>${v}</label>`).join('')}</div><label style="font-size:12px;color:var(--muted)">Khu vực làm việc</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">${Object.entries(DISTRICTS).map(([k,v])=>`<label style="display:flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" name="districts" value="${k}"/>${v}</label>`).join('')}</div><input class="input" name="years_exp" type="number" placeholder="Năm kinh nghiệm"/><input class="input" name="cccd_last4" placeholder="4 số cuối CCCD" maxlength="4"/><button class="btn btn-primary" type="submit">Đăng ký thợ</button></form>`,'Trở thành thợ');};
 
 // ADMIN
-routes['/admin']=async()=>{const s=await api('/admin/stats');let h=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"><div class="card"><div style="font-size:12px;color:var(--muted)">Người dùng</div><div style="font-size:24px;font-weight:800">${s.users}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Thợ</div><div style="font-size:24px;font-weight:800">${s.workers}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Đơn hàng</div><div style="font-size:24px;font-weight:800">${s.orders}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Doanh thu</div><div style="font-size:20px;font-weight:800">${fmt(s.revenue)}</div></div></div><h3 style="margin:24px 0 12px">Người dùng</h3><div id="userList" style="display:flex;flex-direction:column;gap:8px"></div>`;setTimeout(async()=>{const l=$('#userList');if(!l)return;const u=await api('/admin/users');u.forEach(x=>{const d=document.createElement('div');d.className='card';d.style.display='flex';d.style.justifyContent='space-between';d.style.alignItems='center';d.innerHTML=`<div><div style="font-weight:700">${esc(x.name)}</div><div style="font-size:12px;color:var(--muted)">${x.phone}·${x.role}·${x.status}</div></div><button class="btn ${x.status==='active'?'btn-outline':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:12px" data-userid="${id}" data-action="${x.status==='active'?'block':'unblock'}">${x.status==='active'?'Khóa':'Mở khóa'}</button>`;l.appendChild(d);});},0);return shell(h,'Quản trị');};
+routes['/admin']=async()=>{const s=await api('/admin/stats');let h=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"><div class="card"><div style="font-size:12px;color:var(--muted)">Người dùng</div><div style="font-size:24px;font-weight:800">${s.users}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Thợ</div><div style="font-size:24px;font-weight:800">${s.workers}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Đơn hàng</div><div style="font-size:24px;font-weight:800">${s.orders}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Doanh thu</div><div style="font-size:20px;font-weight:800">${fmt(s.revenue)}</div></div></div><h3 style="margin:24px 0 12px">Người dùng</h3><div id="userList" style="display:flex;flex-direction:column;gap:8px"></div>`;setTimeout(async()=>{const l=$('#userList');if(!l)return;const u=await api('/admin/users');u.forEach(x=>{const d=document.createElement('div');d.className='card';d.style.display='flex';d.style.justifyContent='space-between';d.style.alignItems='center';d.innerHTML=`<div><div style="font-weight:700">${esc(x.name)}</div><div style="font-size:12px;color:var(--muted)">${x.phone}·${x.role}·${x.status}</div></div><button class="btn ${x.status==='active'?'btn-outline':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:12px" data-userid="${x.id}" data-action="${x.status==='active'?'block':'unblock'}">${x.status==='active'?'Khóa':'Mở khóa'}</button>`;l.appendChild(d);});},0);return shell(h,'Quản trị');};
 
 // 404
 routes['*']=async()=>shell(`<div style="text-align:center;padding:48px 16px"><div style="font-size:48px">🤷</div><p style="color:var(--muted);margin-top:16px">Không tìm thấy trang</p><a href="#/home" class="btn btn-primary" style="margin-top:16px;display:inline-block;width:auto">Về trang chủ</a></div>`,'Lỗi');
@@ -157,6 +167,9 @@ function bindEvents(){
     const ra=e.target.closest('.read-all-btn');if(ra){try{await api('/notifications/read-all',{method:'POST'});toast('Đã đánh dấu đã đọc');renderRoute();}catch(err){toast(err.message);}}
     const lo=e.target.closest('.logout-btn');if(lo){logout();}
     const ub=e.target.closest('[data-userid]');if(ub){try{const act=ub.dataset.action||'block';await api(`/admin/users/${ub.dataset.userid}/${act}`,{method:'POST'});toast(act==='block'?'Đã khóa':'Đã mở khóa');renderRoute();}catch(err){toast(err.message);}}
+    const acb=e.target.closest('.accept-booking-btn');if(acb){try{await api(`/bookings/${acb.dataset.id}/respond`,{method:'POST',body:JSON.stringify({action:'accept'})});toast('Đã nhận lịch đặt');renderRoute();}catch(err){toast(err.message);}}
+    const dcb=e.target.closest('.decline-booking-btn');if(dcb){try{await api(`/bookings/${dcb.dataset.id}/respond`,{method:'POST',body:JSON.stringify({action:'decline'})});toast('Đã từ chối lịch đặt');renderRoute();}catch(err){toast(err.message);}}
+    const clb=e.target.closest('.claim-booking-btn');if(clb){try{await api(`/bookings/${clb.dataset.id}/respond`,{method:'POST',body:JSON.stringify({action:'accept'})});toast('Đã nhận lịch đặt');renderRoute();}catch(err){toast(err.message);}}
   };
 }
 

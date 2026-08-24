@@ -3,7 +3,7 @@ export const DISTRICTS_HCM = [
   'quan-1','quan-2','quan-3','quan-4','quan-5','quan-6','quan-7','quan-8','quan-9','quan-10',
   'quan-11','quan-12','binh-thanh','go-vap','tan-binh','tan-phu','phu-nhuan','thu-duc'
 ] as const;
-export const COMMISSION_RATE = parseFloat(process.env.COMMISSION_RATE || '0.15');
+export const COMMISSION_RATE = 0.15;
 
 export const BOOKING_STATUSES = ['finding','offered','accepted','in_progress','done','paid','cancelled'] as const;
 export const JOB_STATUSES = ['open','assigned','in_progress','completed','paid','cancelled'] as const;

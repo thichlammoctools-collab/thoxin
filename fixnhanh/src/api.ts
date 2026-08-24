@@ -81,8 +81,17 @@ app.get('/workers', async (c) => {
   if (skill) { q += ' AND wp.skills LIKE ?'; args.push(`%"${skill}"%`); }
   if (district) { q += ' AND wp.districts LIKE ?'; args.push(`%"${district}"%`); }
   q += sort === 'rating' ? ' ORDER BY wp.rating_avg DESC, wp.jobs_done DESC' : ' ORDER BY wp.jobs_done DESC';
-  const res = await c.env.DB.prepare(q).bind(...args).all();
+  const stmt = c.env.DB.prepare(q);
+  const res = args.length ? await stmt.bind(...args).all() : await stmt.all();
   return c.json(rows(res));
+});
+
+app.get('/worker/profile', async (c) => {
+  const user = await getAuthUser(c);
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  const profile = await getWorkerProfile(c.env.DB, user.id);
+  if (!profile) return c.json({ error: 'Not found' }, 404);
+  return c.json(profile);
 });
 
 app.get('/workers/:id', async (c) => {
@@ -170,7 +179,8 @@ app.get('/bookings', async (c) => {
     }
   }
   q += ' ORDER BY created_at DESC';
-  const res = await c.env.DB.prepare(q).bind(...args).all();
+  const stmt = c.env.DB.prepare(q);
+  const res = args.length ? await stmt.bind(...args).all() : await stmt.all();
   return c.json(rows(res));
 });
 
@@ -180,6 +190,20 @@ app.post('/bookings/:id/respond', async (c) => {
   const id = c.req.param('id');
   const booking = await getBooking(c.env.DB, id);
   if (!booking) return c.json({ error: 'Not found' }, 404);
+  if (booking.status === 'finding') {
+    const service = await getService(c.env.DB, booking.service_id);
+    const amount = booking.quoted_price || service?.base_price || 0;
+    const orderId = genId('ord');
+    const convoId = genId('convo');
+    await c.env.DB.batch([
+      c.env.DB.prepare('UPDATE bookings SET worker_id = ?, status = "accepted" WHERE id = ?').bind(user.id, id),
+      c.env.DB.prepare('INSERT INTO orders (id, type, ref_id, customer_id, worker_id, amount, escrow, status) VALUES (?, "instant", ?, ?, ?, ?, "none", "awaiting_payment")').bind(orderId, id, booking.customer_id, user.id, amount),
+      c.env.DB.prepare('INSERT INTO conversations (id, customer_id, worker_id, order_id) VALUES (?, ?, ?, ?)').bind(convoId, booking.customer_id, user.id, orderId)
+    ]);
+    await c.env.DB.prepare('INSERT INTO notifications (id, user_id, type, title, body, payload) VALUES (?, ?, "booking", "Lịch đặt được nhận", "Thợ đã nhận lịch đặt của bạn", ?)')
+      .bind(genId('notif'), booking.customer_id, JSON.stringify({ booking_id: id, order_id: orderId })).run();
+    return c.json({ order_id: orderId, conversation_id: convoId });
+  }
   if (booking.worker_id !== user.id) return c.json({ error: 'Forbidden' }, 403);
   const body = await c.req.json<{ action: 'accept' | 'decline' }>();
   if (body.action === 'accept') {
@@ -292,7 +316,8 @@ app.get('/orders', async (c) => {
   const args: any[] = [];
   if (mine) { q += ' AND (customer_id = ? OR worker_id = ?)'; args.push(user.id, user.id); }
   q += ' ORDER BY created_at DESC';
-  const res = await c.env.DB.prepare(q).bind(...args).all();
+  const stmt = c.env.DB.prepare(q);
+  const res = args.length ? await stmt.bind(...args).all() : await stmt.all();
   return c.json(rows(res));
 });
 
@@ -367,6 +392,7 @@ app.post('/orders/:id/confirm', async (c) => {
   if (!order) return c.json({ error: 'Not found' }, 404);
   if (order.customer_id !== user.id) return c.json({ error: 'Forbidden' }, 403);
   if (order.status !== 'delivered' && order.status !== 'in_progress') return c.json({ error: 'Invalid order status' }, 400);
+  if (order.escrow !== 'held') return c.json({ error: 'Payment not held' }, 400);
   const commission = Math.floor(order.amount * COMMISSION_RATE);
   const workerAmount = order.amount - commission;
   const txReleaseId = genId('tx');
@@ -618,7 +644,8 @@ app.get('/admin/users', async (c) => {
   const args: any[] = [];
   if (role) { q += ' AND role = ?'; args.push(role); }
   q += ' ORDER BY created_at DESC';
-  const res = await c.env.DB.prepare(q).bind(...args).all();
+  const stmt = c.env.DB.prepare(q);
+  const res = args.length ? await stmt.bind(...args).all() : await stmt.all();
   return c.json(rows(res));
 });
 
