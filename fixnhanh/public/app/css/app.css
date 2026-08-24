@@ -149,3 +149,14 @@ body {
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
 .star { color: var(--warning); }
+
+.app-root { display:flex; flex-direction:column; min-height:100dvh; max-width:480px; margin:0 auto; background:var(--surface); }
+.btn-icon { background:none; border:none; font-size:20px; cursor:pointer; padding:4px 8px; color:var(--text); }
+.auth-wrap { max-width:360px; margin:0 auto; }
+textarea.input { resize:vertical; font-family:inherit; }
+select.input { appearance:none; background:#fff; }
+.demo-btn { font-size:13px; }
+label { user-select:none; }
+a { color:var(--primary); text-decoration:none; }
+.empty-state { text-align:center; padding:48px 16px; color:var(--muted); }
+.empty-state .icon { font-size:48px; margin-bottom:12px; }

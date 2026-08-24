@@ -37,14 +37,24 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return hashB64 === storedHash;
 }
 
+function toBase64Url(str: string): string {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function fromBase64Url(str: string): string {
+  const padding = str.length % 4;
+  if (padding) str += '='.repeat(4 - padding);
+  return atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+}
+
 export async function signToken(payload: Record<string, unknown>, secret: string): Promise<string> {
   const enc = new TextEncoder();
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).replace(/=/g, '');
-  const body = btoa(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000) })).replace(/=/g, '');
+  const header = toBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = toBase64Url(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000) }));
   const data = `${header}.${body}`;
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, enc.encode(data));
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g, '');
+  const sigB64 = toBase64Url(String.fromCharCode(...new Uint8Array(sig)));
   return `${data}.${sigB64}`;
 }
 
@@ -54,10 +64,10 @@ export async function verifyToken(token: string, secret: string): Promise<Record
     const data = `${headerB64}.${bodyB64}`;
     const enc = new TextEncoder();
     const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
-    const sig = Uint8Array.from(atob(sigB64), (c) => c.charCodeAt(0));
+    const sig = Uint8Array.from(fromBase64Url(sigB64), (c) => c.charCodeAt(0));
     const ok = await crypto.subtle.verify('HMAC', key, sig, enc.encode(data));
     if (!ok) return null;
-    return JSON.parse(atob(bodyB64));
+    return JSON.parse(fromBase64Url(bodyB64));
   } catch {
     return null;
   }

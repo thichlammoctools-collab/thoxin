@@ -6,7 +6,9 @@ const SHELL_URLS = [
   '/sw.js',
   '/app/index.html',
   '/app/css/app.css',
-  '/app/js/app.js'
+  '/app/js/app.js',
+  '/icons/icon.svg',
+  '/icons/icon-maskable.svg'
 ];
 
 self.addEventListener('install', (event) => {
