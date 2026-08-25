@@ -10,6 +10,7 @@ DELETE FROM bids WHERE id IN ('bid_001','bid_002');
 DELETE FROM orders WHERE id IN ('ord_001','ord_002');
 DELETE FROM jobs WHERE id IN ('job_001','job_002');
 DELETE FROM bookings WHERE id IN ('bk_001','bk_002');
+DELETE FROM services;
 DELETE FROM worker_profiles WHERE user_id IN ('usr_003','usr_004','usr_005','usr_006');
 DELETE FROM passwords WHERE user_id IN ('usr_001','usr_002','usr_003','usr_004','usr_005','usr_006');
 DELETE FROM wallets WHERE user_id IN ('usr_003','usr_004','usr_005','usr_006');
