@@ -1,5 +1,5 @@
 -- 6 services
-INSERT INTO services (id, slug, name, icon, base_price, unit, description) VALUES
+INSERT OR IGNORE INTO services (id, slug, name, icon, base_price, unit, description) VALUES
   ('svc_1','dien','Điện','zap',150000,'lượt','Kiểm tra & sửa chữa điện dân dụng, thay ổ cắm, dây điện...'),
   ('svc_2','nuoc','Nước','droplet',180000,'lượt','Sửa ống nước, van, bồn rửa, toilet...'),
   ('svc_3','moc','Mộc','hammer',200000,'lượt','Sửa tủ, lắp đặt nội thất, đóng tủ...'),
