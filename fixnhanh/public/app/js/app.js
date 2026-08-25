@@ -80,7 +80,9 @@ routes['/home']=async()=>{
     const sv=await api('/services');const o=await api('/orders?mine=1');const wk=await api('/workers?sort=rating');
     h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px">`;
     sv.forEach(s=>h+=`<a href="#/booking?service=${s.id}" class="card" style="text-align:center;text-decoration:none;color:inherit;padding:12px"><div style="font-size:28px">${ICONS[s.slug]||'🛠️'}</div><div style="font-weight:700;font-size:13px">${esc(s.name)}</div><div style="font-size:11px;color:var(--muted)">${fmt(s.base_price)}</div></a>`);
-    h+=`</div><div style="display:flex;gap:8px;margin-bottom:24px"><a href="#/booking" class="btn btn-primary" style="flex:1">Đặt lịch nhanh</a><a href="#/jobs" class="btn btn-accent" style="flex:1">Tìm việc</a></div>`;
+    h+=`</div>`;
+    h+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:24px"><div style="font-weight:700;margin-bottom:10px">Menu</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><a href="#/jobs" class="card" style="text-align:center;text-decoration:none;color:inherit;padding:10px 6px;font-size:12px">📋 Công việc</a><a href="#/workers" class="card" style="text-align:center;text-decoration:none;color:inherit;padding:10px 6px;font-size:12px">👷 Thợ</a><a href="#/orders" class="card" style="text-align:center;text-decoration:none;color:inherit;padding:10px 6px;font-size:12px">🧾 Đơn hàng</a><a href="#/notifications" class="card" style="text-align:center;text-decoration:none;color:inherit;padding:10px 6px;font-size:12px">🔔 Thông báo</a><a href="#/profile" class="card" style="text-align:center;text-decoration:none;color:inherit;padding:10px 6px;font-size:12px">👤 Tôi</a><a href="#/wallet" class="card" style="text-align:center;text-decoration:none;color:inherit;padding:10px 6px;font-size:12px">💰 Ví</a></div></div>`;
+    h+=`<div style="display:flex;gap:8px;margin-bottom:24px"><a href="#/booking" class="btn btn-primary" style="flex:1">Đặt lịch nhanh</a><a href="#/jobs" class="btn btn-accent" style="flex:1">Tìm việc</a></div>`;
     if(o.length){
       h+=`<h2 style="margin:0 0 12px">Việc của tôi</h2><div style="display:flex;flex-direction:column;gap:8px">`;
       o.slice(0,5).forEach(x=>h+=`<a href="#/orders/${x.id}" class="card" style="text-decoration:none;color:inherit"><div style="display:flex;justify-content:space-between"><div><div style="font-weight:700">Đơn #${x.id.slice(-6)}</div><div style="font-size:12px;color:var(--muted)">${x.type==='instant'?'Đặt lịch':'Việc'}·${fmt(x.amount)}</div></div><span style="background:${statusColor(x.status)};color:#fff;padding:4px 8px;border-radius:999px;font-size:11px">${x.status}</span></div></a>`);
@@ -151,8 +153,8 @@ async function renderRoute(){
     if((m=hash.match(/^#\/jobs\/([^\/]+)$/))){fn=routes['/jobs/:id'];arg=m[1];}
     else if((m=hash.match(/^#\/orders\/([^\/]+)$/))){fn=routes['/orders/:id'];arg=m[1];}
     else if((m=hash.match(/^#\/chat\/([^\/]+)$/))){fn=routes['/chat/:id'];arg=m[1];}
-    else if((m=hash.match(/^#\/workers\/([^\/]+)$/))){fn=routes['/workers/:id'];arg=m[1];}
-    else if((m=hash.match(/^#\/workers\b/))){fn=routes['/workers'];}
+    else if((m=hash.match(/^#\/workers\/[^\/]+$/))){fn=routes['/workers/:id'];arg=m[0].split('/').pop();}
+    else if((m=hash.match(/^#\/workers\/?$/))){fn=routes['/workers'];}
     else fn=routes['*'];
   }
   try{

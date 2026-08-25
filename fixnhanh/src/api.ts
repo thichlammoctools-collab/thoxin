@@ -49,6 +49,7 @@ app.post('/login', async (c) => {
   const { phone, password } = body;
   const user = await getUserByPhone(c.env.DB, phone);
   if (!user) return c.json({ error: 'Invalid credentials' }, 401);
+  if (user.status === 'blocked') return c.json({ error: 'Account blocked' }, 403);
   const pw = await c.env.DB.prepare('SELECT hash FROM passwords WHERE user_id = ?').bind(user.id).first();
   if (!pw) return c.json({ error: 'Invalid credentials' }, 401);
   const ok = await verifyPassword(password, pw.hash as string, c.env.JWT_SECRET.startsWith('dev-'));

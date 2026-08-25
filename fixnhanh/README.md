@@ -17,6 +17,7 @@ fixnhanh/
 ├── src/
 │   ├── index.tsx      # Worker entry, routes, WS, R2
 │   ├── api.ts         # REST API đầy đủ
+│   ├── admin.tsx      # Trang quản trị /admin
 │   ├── auth.ts        # JWT, PBKDF2
 │   ├── chat.ts        # Durable Object chat
 │   ├── constants.ts   # skills, districts, commission
@@ -46,18 +47,25 @@ Yêu cầu: Node.js 18+, npm.
 # 1. Cài dependencies
 npm install
 
-# 2. Tạo D1 local + seed data
+# 2. Tạo .dev.vars với JWT_SECRET dev (bắt buộc cho đăng nhập demo)
+echo "JWT_SECRET=dev-local-secret" > .dev.vars
+
+# 3. Tạo D1 local + seed data
 npm run db:local
 
-# 3. Chạy dev server
+# 4. Chạy dev server
 npm run dev
 ```
 
 Mở:
 - Landing page: http://localhost:8787/
 - PWA app: http://localhost:8787/app
+- Trang quản trị (chỉ role admin): http://localhost:8787/admin
 
 ### Tài khoản demo (password: `fixnhanh123`)
+
+> Mật khẩu demo chỉ hợp lệ khi `JWT_SECRET` bắt đầu bằng `dev-` (local).
+> Trên production, seed hash PBKDF2 thật (`node scripts/seed-hash.mjs`) và không dùng secret `dev-`.
 
 | Vaiò | Số điện thoại |
 |------|---------------|

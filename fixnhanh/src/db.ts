@@ -23,35 +23,35 @@ export function rows<T>(r: D1Result<T> | null): T[] {
 }
 
 export async function getUserByPhone(db: D1Database, phone: string): Promise<User | undefined> {
-  return row(await db.prepare('SELECT * FROM users WHERE phone = ?').bind(phone).first());
+  return (await db.prepare('SELECT * FROM users WHERE phone = ?').bind(phone).first()) ?? undefined;
 }
 
 export async function getUserById(db: D1Database, id: string): Promise<User | undefined> {
-  return row(await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first());
+  return (await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first()) ?? undefined;
 }
 
 export async function getWorkerProfile(db: D1Database, userId: string): Promise<WorkerProfile | undefined> {
-  return row(await db.prepare('SELECT * FROM worker_profiles WHERE user_id = ?').bind(userId).first());
+  return (await db.prepare('SELECT * FROM worker_profiles WHERE user_id = ?').bind(userId).first()) ?? undefined;
 }
 
 export async function getService(db: D1Database, id: string): Promise<Service | undefined> {
-  return row(await db.prepare('SELECT * FROM services WHERE id = ?').bind(id).first());
+  return (await db.prepare('SELECT * FROM services WHERE id = ?').bind(id).first()) ?? undefined;
 }
 
 export async function getBooking(db: D1Database, id: string): Promise<Booking | undefined> {
-  return row(await db.prepare('SELECT * FROM bookings WHERE id = ?').bind(id).first());
+  return (await db.prepare('SELECT * FROM bookings WHERE id = ?').bind(id).first()) ?? undefined;
 }
 
 export async function getJob(db: D1Database, id: string): Promise<Job | undefined> {
-  return row(await db.prepare('SELECT * FROM jobs WHERE id = ?').bind(id).first());
+  return (await db.prepare('SELECT * FROM jobs WHERE id = ?').bind(id).first()) ?? undefined;
 }
 
 export async function getOrder(db: D1Database, id: string): Promise<Order | undefined> {
-  return row(await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first());
+  return (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) ?? undefined;
 }
 
 export async function getWallet(db: D1Database, userId: string): Promise<Wallet | undefined> {
-  return row(await db.prepare('SELECT * FROM wallets WHERE user_id = ?').bind(userId).first());
+  return (await db.prepare('SELECT * FROM wallets WHERE user_id = ?').bind(userId).first()) ?? undefined;
 }
 
 export async function listWorkers(db: D1Database, skill?: string, district?: string, sort = 'rating'): Promise<WorkerProfile[]> {
