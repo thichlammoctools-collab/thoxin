@@ -43,7 +43,7 @@ app.post('/login', async (c) => {
   if (!user) return c.json({ error: 'Invalid credentials' }, 401);
   const pw = await c.env.DB.prepare('SELECT hash FROM passwords WHERE user_id = ?').bind(user.id).first();
   if (!pw) return c.json({ error: 'Invalid credentials' }, 401);
-  const ok = await verifyPassword(password, pw.hash as string);
+  const ok = await verifyPassword(password, pw.hash as string, c.env.JWT_SECRET.startsWith('dev-'));
   if (!ok) return c.json({ error: 'Invalid credentials' }, 401);
   const token = await signToken({ sub: user.id, phone: user.phone, role: user.role }, c.env.JWT_SECRET);
   return c.json({ token, user: { id: user.id, phone: user.phone, name: user.name, role: user.role, avatar_url: user.avatar_url } });
@@ -233,7 +233,8 @@ app.post('/bookings/:id/status', async (c) => {
   if (!booking) return c.json({ error: 'Not found' }, 404);
   if (booking.worker_id !== user.id) return c.json({ error: 'Forbidden' }, 403);
   const body = await c.req.json<{ status: string }>();
-  const valid = ['arrived', 'in_progress', 'done'];
+  // Phải khớp CHECK(status IN ...) trong schema.sql
+  const valid = ['finding', 'offered', 'accepted', 'in_progress', 'done', 'paid', 'cancelled'];
   if (!valid.includes(body.status)) return c.json({ error: 'Invalid status' }, 400);
   await c.env.DB.prepare('UPDATE bookings SET status = ? WHERE id = ?').bind(body.status, id).run();
   return c.json({ ok: true });
@@ -560,24 +561,34 @@ app.post('/conversations/:id/messages', async (c) => {
   const otherParty = (convo as any).customer_id === user.id ? (convo as any).worker_id : (convo as any).customer_id;
   await c.env.DB.prepare('INSERT INTO notifications (id, user_id, type, title, body, payload) VALUES (?, ?, "message", "Tin nhắn mới", ?, ?)')
     .bind(genId('notif'), otherParty, body.body.slice(0, 100), JSON.stringify({ conversation_id: id })).run();
+  // Fan-out realtime tới các socket đang mở trong phòng chat (nếu có)
+  try {
+    const doStub = c.env.CHAT.get(c.env.CHAT.idFromName(id));
+    await doStub.broadcastMessage({ id: msgId, conversationId: id, senderId: user.id, body: body.body, attachmentUrl: body.attachment_url || null, created_at: ts });
+  } catch (e) {
+    console.error('chat broadcast failed', e);
+  }
   return c.json({ id: msgId }, 201);
 });
 
 app.get('/ws/chat/:conversationId', async (c) => {
   const id = c.req.param('conversationId');
+  const upgrade = (c.req.header('Upgrade') || '').toLowerCase();
+  if (upgrade !== 'websocket') return c.json({ error: 'Expected websocket' }, 426);
   const url = new URL(c.req.url);
   const token = url.searchParams.get('token');
   if (!token) return c.json({ error: 'Missing token' }, 400);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
-  if (!payload) return c.json({ error: 'Unauthorized' }, 401);
-  const pair = new WebSocketPair();
-  const [client, server] = Object.values(pair);
-  server.accept();
-  server.serializeOptions = { maxDuration: 0 };
-  const id_ = c.env.CHAT.idFromName(id);
-  const doStub = c.env.CHAT.get(id_);
-  await doStub.acceptWebSocket(server);
-  return c.json({ ok: true });
+  if (!payload?.sub) return c.json({ error: 'Unauthorized' }, 401);
+  // Chỉ thành viên của conversation mới được kết nối
+  const convo = await c.env.DB.prepare('SELECT * FROM conversations WHERE id = ?').bind(id).first() as any;
+  if (!convo) return c.json({ error: 'Not found' }, 404);
+  if (convo.customer_id !== payload.sub && convo.worker_id !== payload.sub) return c.json({ error: 'Forbidden' }, 403);
+  const doId = c.env.CHAT.idFromName(id);
+  const doStub = c.env.CHAT.get(doId);
+  // Forward request gốc (kèm header định danh) tới DO — DO trả response 101
+  const req = new Request(c.req.raw, { headers: new Headers([...c.req.raw.headers, ['X-Chat-User', String(payload.sub)]]) });
+  return doStub.fetch(req);
 });
 
 // ==================== NOTIFICATIONS ====================
@@ -617,8 +628,10 @@ app.post('/uploads', async (c) => {
   return c.json({ key }, 201);
 });
 
-app.get('/photos/:key', async (c) => {
-  const key = c.req.param('key');
+app.get('/photos/*', async (c) => {
+  // Key dạng "uploads/..." — lấy toàn bộ phần sau /photos/
+  const key = c.req.path.replace(/^\/photos\//, '');
+  if (!key) return c.json({ error: 'Not found' }, 404);
   const obj = await c.env.PHOTOS.get(key);
   if (!obj) return c.json({ error: 'Not found' }, 404);
   return new Response(obj.body, { headers: { 'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream' } });

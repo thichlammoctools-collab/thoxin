@@ -8,7 +8,10 @@ INSERT INTO services (id, slug, name, icon, base_price, unit, description) VALUE
   ('svc_6','ve-sinh','Vệ sinh','broom',300000,'lượt','Vệ sinh nhà cửa, máy lạnh, kính cao cấp...');
 
 -- 3 demo accounts
--- NOTE: Replace dev_fixnhanh123 with actual PBKDF2 hash by running: node scripts/seed-hash.mjs
+-- Password demo: fixnhanh123 — lưu dạng sentinel 'dev_fixnhanh123'.
+-- auth.ts chỉ chấp nhận sentinel này khi JWT_SECRET bắt đầu bằng "dev-"
+-- (local dev). Trên production hãy seed hash PBKDF2 thật:
+--   node scripts/seed-hash.mjs
 INSERT INTO users (id, phone, name, role, avatar_url, status) VALUES
   ('usr_001','0900999999','Admin FixNhanh','admin','https://api.dicebear.com/7.x/avataaars/svg?seed=admin','active'),
   ('usr_002','0900000001','Khách Hàng Demo','customer','https://api.dicebear.com/7.x/avataaars/svg?seed=customer','active'),

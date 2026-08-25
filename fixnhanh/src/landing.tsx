@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { jsx } from 'hono/jsx';
 import type { Env } from './types';
 
 export const landing = new Hono<{ Bindings: Env }>();

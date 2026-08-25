@@ -18,9 +18,10 @@ export async function hashPassword(password: string): Promise<string> {
   return `pbkdf2$25000$${saltB64}$${hashB64}`;
 }
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  // Dev fallback for seeded demo accounts
-  if (hash === 'dev_fixnhanh123') return password === 'fixnhanh123';
+export async function verifyPassword(password: string, hash: string, allowDevFallback = false): Promise<boolean> {
+  // Dev fallback cho tài khoản demo trong seed.sql — CHỈ bật khi JWT_SECRET là dev secret
+  // (tránh việc ai cũng đăng nhập được tài khoản demo khi deploy production)
+  if (hash === 'dev_fixnhanh123') return allowDevFallback && password === 'fixnhanh123';
   const [, iterStr, , storedHash] = hash.split('$');
   const iterations = parseInt(iterStr || '25000', 10);
   const enc = new TextEncoder().encode(password);
