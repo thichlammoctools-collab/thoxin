@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { landing } from './landing';
 import { api } from './api';
+import { admin } from './admin';
 import { ChatDO } from './chat';
 import type { Env } from './types';
 
@@ -8,6 +9,7 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.route('/', landing);
 app.route('/api', api);
+app.route('/admin', admin);
 
 app.get('/photos/*', async (c) => {
   const key = c.req.path.replace(/^\/photos\//, '');

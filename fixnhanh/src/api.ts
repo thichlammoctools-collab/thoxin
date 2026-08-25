@@ -656,44 +656,61 @@ app.get('/photos/*', async (c) => {
 
 // ==================== ADMIN ====================
 
-app.get('/admin/stats', async (c) => {
+async function requireAdmin(c: any) {
   const user = await getAuthUser(c);
-  if (!user || user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403);
-  const usersCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first();
-  const workersCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users WHERE role = "worker"').first();
-  const ordersCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM orders').first();
-  const revenue = await c.env.DB.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM orders').first();
-  return c.json({ users: (usersCount as any).count, workers: (workersCount as any).count, orders: (ordersCount as any).count, revenue: (revenue as any).total });
+  if (!user) return { error: c.json({ error: 'Unauthorized' }, 401) };
+  if (user.role !== 'admin') return { error: c.json({ error: 'Forbidden' }, 403) };
+  return { user };
+}
+
+app.get('/admin/stats', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
+  const [usersCount, workersCount, ordersCount, revenue] = await Promise.all([
+    c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first(),
+    c.env.DB.prepare('SELECT COUNT(*) as count FROM users WHERE role = ?').bind('worker').first(),
+    c.env.DB.prepare('SELECT COUNT(*) as count FROM orders').first(),
+    c.env.DB.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE kind = ?').bind('commission').first()
+  ]);
+  return c.json({
+    users: Number((usersCount as any)?.count || 0),
+    workers: Number((workersCount as any)?.count || 0),
+    orders: Number((ordersCount as any)?.count || 0),
+    revenue: Number((revenue as any)?.total || 0)
+  });
 });
 
 app.get('/admin/users', async (c) => {
-  const user = await getAuthUser(c);
-  if (!user || user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403);
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
   const role = c.req.query('role');
-  let q = 'SELECT * FROM users WHERE 1=1';
+  if (role && !['customer', 'worker', 'admin'].includes(role)) return c.json({ error: 'Invalid role' }, 400);
+  const parsedLimit = Number(c.req.query('limit') || 20);
+  const parsedOffset = Number(c.req.query('offset') || 0);
+  const limit = Number.isInteger(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20;
+  const offset = Number.isInteger(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
+  let where = ' WHERE 1=1';
   const args: any[] = [];
-  if (role) { q += ' AND role = ?'; args.push(role); }
-  q += ' ORDER BY created_at DESC';
-  const stmt = c.env.DB.prepare(q);
-  const res = args.length ? await stmt.bind(...args).all() : await stmt.all();
-  return c.json(rows(res));
+  if (role) { where += ' AND role = ?'; args.push(role); }
+  const totalRow = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM users${where}`).bind(...args).first();
+  const query = `SELECT id, phone, name, role, avatar_url, status, created_at FROM users${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  const res = await c.env.DB.prepare(query).bind(...args, limit, offset).all();
+  return c.json({ items: rows(res), total: Number((totalRow as any)?.count || 0), limit, offset });
 });
 
-app.post('/admin/users/:id/block', async (c) => {
-  const user = await getAuthUser(c);
-  if (!user || user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403);
+async function updateAdminUserStatus(c: any, status: 'active' | 'blocked') {
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
   const id = c.req.param('id');
-  await c.env.DB.prepare('UPDATE users SET status = "blocked" WHERE id = ?').bind(id).run();
-  return c.json({ ok: true });
-});
+  const target = await getUserById(c.env.DB, id);
+  if (!target) return c.json({ error: 'User not found' }, 404);
+  if (target.role === 'admin') return c.json({ error: 'Cannot change admin status' }, 403);
+  await c.env.DB.prepare('UPDATE users SET status = ? WHERE id = ?').bind(status, id).run();
+  return c.json({ ok: true, id, status });
+}
 
-app.post('/admin/users/:id/unblock', async (c) => {
-  const user = await getAuthUser(c);
-  if (!user || user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403);
-  const id = c.req.param('id');
-  await c.env.DB.prepare('UPDATE users SET status = "active" WHERE id = ?').bind(id).run();
-  return c.json({ ok: true });
-});
+app.post('/admin/users/:id/block', (c) => updateAdminUserStatus(c, 'blocked'));
+app.post('/admin/users/:id/unblock', (c) => updateAdminUserStatus(c, 'active'));
 
 // ==================== DEV SEED ====================
 
