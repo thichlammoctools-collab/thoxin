@@ -14,61 +14,31 @@ landing.get('/', async (c) => {
         <meta name="description" content="Tìm thợ điện, nước, mộc, sơn... tận nhà tại TP.HCM. Đặt lịch nhanh, giá rõ ràng, thanh toán an toàn." />
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="icon" href="/icons/icon.svg" />
-        <script dangerouslySetInnerHTML={{ __html: `self.CSS_SUPPORT=true;` }} />
+        <style>{`
+          :root{--blue:#0B6CFF;--navy:#102A43;--muted:#62748A;--line:#DCE5F0;--bg:#F5F8FC;--orange:#FF7A00}
+          *{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--navy);line-height:1.5;-webkit-font-smoothing:antialiased}
+          a{color:inherit;text-decoration:none}.wrap{max-width:1180px;margin:auto;padding:0 24px}.nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}.brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800;letter-spacing:-.03em}.brand-mark{width:34px;height:34px;border-radius:10px;background:var(--blue);display:grid;place-items:center;color:#fff;font-weight:900}.nav-link{font-size:14px;color:var(--muted);font-weight:700}.hero{padding:42px 0 78px;background:linear-gradient(180deg,#fff 0%,#F5F8FC 100%)}.hero-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);gap:64px;align-items:center}.eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--blue);font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.eyebrow:before{content:'';width:24px;height:2px;background:var(--orange)}h1{font-size:clamp(42px,6vw,72px);line-height:1.02;letter-spacing:-.065em;margin:18px 0 20px;max-width:720px}h2{font-size:clamp(28px,4vw,40px);line-height:1.1;letter-spacing:-.05em;margin:0 0 12px}.lead{font-size:19px;line-height:1.6;color:var(--muted);max-width:570px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;border-radius:10px;font-size:15px;font-weight:800}.btn-primary{background:var(--blue);color:#fff}.btn-secondary{background:#fff;border:1px solid var(--line);color:var(--navy)}.hero-panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 20px 50px rgba(16,42,67,.1)}.panel-top{display:flex;align-items:center;justify-content:space-between;padding-bottom:16px;border-bottom:1px solid var(--line);font-weight:800}.dot{width:9px;height:9px;border-radius:50%;background:#22A06B;display:inline-block;margin-right:7px}.request{padding:18px 0;border-bottom:1px solid var(--line)}.request:last-child{border-bottom:0;padding-bottom:2px}.request-title{font-weight:800;margin-bottom:5px}.meta{color:var(--muted);font-size:13px}.status{display:inline-block;padding:4px 8px;border-radius:999px;background:#E7F7F0;color:#11875D;font-size:11px;font-weight:800;margin-top:10px}.section{padding:78px 0}.section-head{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:24px}.section-copy{max-width:520px;color:var(--muted)}.service-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.service{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px 12px;text-align:center;min-height:128px;transition:transform .18s,box-shadow .18s}.service:hover,.worker:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(16,42,67,.09)}.service-icon{width:42px;height:42px;border-radius:12px;background:#EAF2FF;color:var(--blue);display:grid;place-items:center;margin:0 auto 12px;font-weight:900;font-size:19px}.service-name{font-weight:800;font-size:14px}.price{font-size:12px;color:var(--muted);margin-top:4px}.workers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.worker{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;align-items:center;gap:13px;transition:transform .18s,box-shadow .18s}.avatar{width:48px;height:48px;border-radius:50%;background:#EAF2FF;color:var(--blue);display:grid;place-items:center;font-weight:800;flex:none}.trust{background:var(--navy);color:#fff;border-radius:20px;padding:42px;display:grid;grid-template-columns:1.2fr 1fr;gap:32px;align-items:center}.trust h2{max-width:480px}.trust p{color:#B8C7D8;margin:0}.trust-list{display:grid;grid-template-columns:1fr 1fr;gap:12px}.trust-item{border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:16px;font-size:14px;font-weight:700}.cta{text-align:center;padding:80px 0 92px}.cta p{color:var(--muted);margin:0 0 24px}.footer{border-top:1px solid var(--line);padding:24px 0;color:var(--muted);font-size:13px}.footer .wrap{display:flex;justify-content:space-between;gap:16px}
+          @media(max-width:800px){.hero-grid,.trust{grid-template-columns:1fr;gap:34px}.service-grid{grid-template-columns:repeat(3,1fr)}.workers{grid-template-columns:1fr 1fr}.section{padding:58px 0}.hero{padding-top:18px}.wrap{padding:0 18px}}
+          @media(max-width:520px){.nav-link{display:none}h1{font-size:44px}.lead{font-size:17px}.service-grid{grid-template-columns:repeat(2,1fr)}.workers{grid-template-columns:1fr}.trust{padding:28px 22px}.trust-list{grid-template-columns:1fr}.footer .wrap{display:block}.footer small{display:block;margin-top:6px}}
+        `}</style>
       </head>
-      <body style="margin:0;font-family:system-ui,-apple-system,sans-serif;background:#F5F8FC;color:#0B2438">
-        <header style="background:linear-gradient(135deg,#0B6CFF,#00C2FF);color:#fff;padding:24px 16px 48px;border-radius:0 0 24px 24px">
-          <div style="max-width:1200px;margin:0 auto">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M16 2L4 14h6v8l10 6 10-6v-8h6L16 2z" fill="#FF7A00"/></svg>
-              <span style="font-size:20px;font-weight:800">FixNhanh</span>
-            </div>
-            <h1 style="font-size:28px;margin:0 0 8px;line-height:1.2">Sửa chữa tận nhà<br/>chỉ trong vài giây</h1>
-            <p style="margin:0;opacity:0.95;font-size:16px">Điện · Nước · Mộc · Điện lạnh · Sơn · Vệ sinh</p>
-            <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
-              <a href="/app" style="background:#FF7A00;color:#fff;padding:12px 20px;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Mở app FixNhanh</a>
-              <a href="/app" style="background:rgba(255,255,255,0.2);color:#fff;padding:12px 20px;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px;backdrop-filter:blur(6px)">Tìm thợ ngay</a>
+      <body>
+        <header class="hero">
+          <div class="wrap">
+            <nav class="nav"><a class="brand" href="/"><span class="brand-mark">F</span><span>FixNhanh</span></a><a class="nav-link" href="/app">Mở ứng dụng →</a></nav>
+            <div class="hero-grid">
+              <div><div class="eyebrow">Sửa chữa tận nhà tại TP.HCM</div><h1>Việc khó trong nhà, để FixNhanh lo.</h1><p class="lead">Kết nối với thợ phù hợp trong vài phút. Giá rõ ràng, lịch hẹn minh bạch và thanh toán an toàn đến khi công việc hoàn tất.</p><div class="actions"><a class="btn btn-primary" href="/app">Đặt lịch ngay</a><a class="btn btn-secondary" href="/app#/jobs">Tìm việc đang mở</a></div></div>
+              <div class="hero-panel"><div class="panel-top"><span>Đơn gần đây</span><span class="meta"><i class="dot"></i>Đang hoạt động</span></div><div class="request"><div class="request-title">Sửa vòi nước bị rò</div><div class="meta">Bình Thạnh · Hôm nay, 14:30</div><span class="status">Đã tìm thấy thợ phù hợp</span></div><div class="request"><div class="request-title">Lắp quạt trần phòng khách</div><div class="meta">Quận 3 · Ngày mai, 09:00</div><span class="status">Đã xác nhận lịch</span></div></div>
             </div>
           </div>
         </header>
-        <main style="max-width:1200px;margin:0 auto;padding:24px 16px">
-          <section style="margin-bottom:32px">
-            <h2 style="font-size:22px;margin:0 0 16px">Dịch vụ phổ biến</h2>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
-              {(services.results || []).map((s: any) => (
-                <div key={s.id} style="background:#fff;padding:16px;border-radius:16px;box-shadow:0 2px 8px rgba(11,108,255,0.06);text-align:center">
-                  <div style="font-size:28px;margin-bottom:8px">{s.icon}</div>
-                  <div style="font-weight:700;color:#0B2438">{s.name}</div>
-                  <div style="font-size:13px;color:#64748B;margin-top:4px">Từ {new Intl.NumberFormat('vi-VN').format(s.base_price)}đ/{s.unit}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-          <section style="margin-bottom:32px">
-            <h2 style="font-size:22px;margin:0 0 16px">Thợ hàng đầu</h2>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
-              {(workers.results || []).map((w: any) => (
-                <div key={w.user_id} style="background:#fff;padding:16px;border-radius:16px;box-shadow:0 2px 8px rgba(11,108,255,0.06)">
-                  <div style="display:flex;align-items:center;gap:12px">
-                    <div style="width:48px;height:48px;border-radius:50%;background:#EFF6FF;display:flex;align-items:center;justify-content:center;font-weight:700;color:#0B6CFF">{w.user_id?.slice(-2)}</div>
-                    <div>
-                      <div style="font-weight:700;color:#0B2438">Thợ #{w.user_id?.slice(-4)}</div>
-                      <div style="font-size:12px;color:#64748B">{w.skills?.replace(/[\[\]"]/g,'').split(',')[0]} · ⭐ {w.rating_avg}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-          <section style="text-align:center;padding:24px 0">
-            <h2 style="font-size:22px;margin:0 0 8px">Sẵn sàng sửa chữa tận nhà?</h2>
-            <p style="color:#64748B;margin:0 0 16px">Đặt lịch trên FixNhanh, thợ xác nhận trong vài phút.</p>
-            <a href="/app" style="background:#0B6CFF;color:#fff;padding:14px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px">Bắt đầu ngay</a>
-          </section>
+        <main>
+          <section class="section"><div class="wrap"><div class="section-head"><div><div class="eyebrow">Dịch vụ phổ biến</div><h2>Một nơi cho mọi việc cần sửa.</h2></div><p class="section-copy">Từ những việc nhỏ hằng ngày đến yêu cầu cần thợ chuyên môn, bạn luôn biết mình đang đặt dịch vụ gì và chi phí dự kiến bao nhiêu.</p></div><div class="service-grid">{(services.results || []).map((s: any) => <a class="service" href={`/app#/booking?service=${s.id}`} key={s.id}><div class="service-icon">{s.icon || 'F'}</div><div class="service-name">{s.name}</div><div class="price">Từ {new Intl.NumberFormat('vi-VN').format(s.base_price)}đ/{s.unit}</div></a>)}</div></div></section>
+          <section class="section" style="padding-top:0"><div class="wrap"><div class="trust"><div><div class="eyebrow" style="color:#8DB7FF">Vì sao chọn FixNhanh</div><h2>Rõ ràng từ lúc đặt lịch đến lúc hoàn tất.</h2><p>Không đoán giá, không mất công gọi nhiều nơi. Mọi cập nhật đều nằm trong một luồng đơn hàng duy nhất.</p></div><div class="trust-list"><div class="trust-item">01<br/><span style="color:#B8C7D8;font-weight:500">Chọn đúng dịch vụ</span></div><div class="trust-item">02<br/><span style="color:#B8C7D8;font-weight:500">Theo dõi trạng thái</span></div><div class="trust-item">03<br/><span style="color:#B8C7D8;font-weight:500">Thanh toán an toàn</span></div><div class="trust-item">04<br/><span style="color:#B8C7D8;font-weight:500">Đánh giá sau việc</span></div></div></div></div></section>
+          <section class="section"><div class="wrap"><div class="section-head"><div><div class="eyebrow">Thợ được tin chọn</div><h2>Người thật, tay nghề thật.</h2></div><p class="section-copy">Các thợ nổi bật được sắp xếp theo đánh giá và số việc đã hoàn thành trên nền tảng.</p></div><div class="workers">{(workers.results || []).map((w: any) => <div class="worker" key={w.user_id}><div class="avatar">{w.user_id?.slice(-2)}</div><div><div style="font-weight:800">Thợ #{w.user_id?.slice(-4)}</div><div class="meta">{w.skills?.replace(/[\[\]"]/g,'').split(',')[0]} · ★ {w.rating_avg}</div></div></div>)}</div></div></section>
+          <section class="cta"><div class="wrap"><h2>Sẵn sàng xử lý việc nhà?</h2><p>Đặt lịch trên FixNhanh, thợ xác nhận trong vài phút.</p><a class="btn btn-primary" href="/app">Bắt đầu ngay</a></div></section>
         </main>
-        <footer style="text-align:center;padding:24px;color:#94A3B8;font-size:12px">
-          © 2026 FixNhanh. Đặt lịch thợ sửa chữa tận nhà TP.HCM.
-        </footer>
+        <footer class="footer"><div class="wrap"><span>© 2026 FixNhanh</span><small>Đặt lịch thợ sửa chữa tận nhà tại TP.HCM.</small></div></footer>
       </body>
     </html>
   );
