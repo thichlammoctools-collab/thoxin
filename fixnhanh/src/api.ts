@@ -21,18 +21,25 @@ function now() {
 // ==================== AUTH ====================
 
 app.post('/register', async (c) => {
-  const body = await c.req.json<{ phone: string; name: string; password: string; role?: string }>();
+  const body = await c.req.json<{ phone: string; name: string; password: string; role?: string; bio?: string; skills?: string[]; districts?: string[]; years_exp?: number }>();
   const { phone, name, password } = body;
-  const role = 'customer';
+  const role = body.role === 'worker' ? 'worker' : 'customer';
   if (!phone || !name || !password) return c.json({ error: 'Missing fields' }, 400);
   const existing = await getUserByPhone(c.env.DB, phone);
   if (existing) return c.json({ error: 'Phone already registered' }, 409);
   const id = genId('usr');
   const hash = await hashPassword(password);
-  await c.env.DB.batch([
+  const wantsWorkerProfile = role === 'worker';
+  const inserts = [
     c.env.DB.prepare('INSERT INTO users (id, phone, name, role) VALUES (?, ?, ?, ?)').bind(id, phone, name, role),
     c.env.DB.prepare('INSERT INTO passwords (user_id, hash) VALUES (?, ?)').bind(id, hash)
-  ]);
+  ];
+  if (wantsWorkerProfile) {
+    inserts.push(
+      c.env.DB.prepare('INSERT INTO worker_profiles (user_id, bio, skills, districts, years_exp) VALUES (?, ?, ?, ?, ?)').bind(id, body.bio || '', JSON.stringify(body.skills || []), JSON.stringify(body.districts || []), body.years_exp || 0)
+    );
+  }
+  await c.env.DB.batch(inserts);
   const token = await signToken({ sub: id, phone, role }, c.env.JWT_SECRET);
   return c.json({ token, user: { id, phone, name, role } });
 });
