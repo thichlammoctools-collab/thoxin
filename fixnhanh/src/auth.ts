@@ -50,8 +50,9 @@ function fromBase64Url(str: string): string {
 
 export async function signToken(payload: Record<string, unknown>, secret: string): Promise<string> {
   const enc = new TextEncoder();
+  const now = Math.floor(Date.now() / 1000);
   const header = toBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = toBase64Url(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000) }));
+  const body = toBase64Url(JSON.stringify({ ...payload, iat: now, exp: now + 7 * 24 * 60 * 60 }));
   const data = `${header}.${body}`;
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, enc.encode(data));
@@ -68,7 +69,9 @@ export async function verifyToken(token: string, secret: string): Promise<Record
     const sig = Uint8Array.from(fromBase64Url(sigB64), (c) => c.charCodeAt(0));
     const ok = await crypto.subtle.verify('HMAC', key, sig, enc.encode(data));
     if (!ok) return null;
-    return JSON.parse(fromBase64Url(bodyB64));
+    const payload = JSON.parse(fromBase64Url(bodyB64)) as Record<string, unknown>;
+    if (typeof payload.exp !== 'number' || payload.exp <= Math.floor(Date.now() / 1000)) return null;
+    return payload;
   } catch {
     return null;
   }

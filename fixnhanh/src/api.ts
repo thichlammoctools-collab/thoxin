@@ -11,7 +11,7 @@ async function getAuthUser(c: any) {
   const payload = await verifyToken(auth.replace('Bearer ', ''), c.env.JWT_SECRET);
   if (!payload) return null;
   const user = await getUserById(c.env.DB, payload.sub as string);
-  return user || null;
+  return user && user.status === 'active' ? user : null;
 }
 
 function now() {
@@ -22,7 +22,8 @@ function now() {
 
 app.post('/register', async (c) => {
   const body = await c.req.json<{ phone: string; name: string; password: string; role?: string }>();
-  const { phone, name, password, role = 'customer' } = body;
+  const { phone, name, password } = body;
+  const role = 'customer';
   if (!phone || !name || !password) return c.json({ error: 'Missing fields' }, 400);
   const existing = await getUserByPhone(c.env.DB, phone);
   if (existing) return c.json({ error: 'Phone already registered' }, 409);
@@ -169,7 +170,7 @@ app.get('/bookings', async (c) => {
   const mine = c.req.query('mine') === '1';
   let q = 'SELECT * FROM bookings WHERE 1=1';
   const args: any[] = [];
-  if (mine) {
+  if (mine || user.role !== 'admin') {
     if (user.role === 'worker') {
       q += ' AND (worker_id = ? OR status = "finding")';
       args.push(user.id);
@@ -191,6 +192,7 @@ app.post('/bookings/:id/respond', async (c) => {
   const booking = await getBooking(c.env.DB, id);
   if (!booking) return c.json({ error: 'Not found' }, 404);
   if (booking.status === 'finding') {
+    if (user.role !== 'worker') return c.json({ error: 'Only workers can respond' }, 403);
     const service = await getService(c.env.DB, booking.service_id);
     const amount = booking.quoted_price || service?.base_price || 0;
     const orderId = genId('ord');
@@ -274,6 +276,8 @@ app.post('/jobs/:id/bids', async (c) => {
   const id = c.req.param('id');
   const job = await getJob(c.env.DB, id);
   if (!job) return c.json({ error: 'Not found' }, 404);
+  if (user.role !== 'worker') return c.json({ error: 'Only workers can bid' }, 403);
+  if (job.customer_id === user.id) return c.json({ error: 'Cannot bid on your own job' }, 403);
   if (job.status !== 'open') return c.json({ error: 'Job not open' }, 400);
   const body = await c.req.json<{ price: number; message?: string; duration_days?: number }>();
   if (!body.price) return c.json({ error: 'Missing price' }, 400);
@@ -315,7 +319,7 @@ app.get('/orders', async (c) => {
   const mine = c.req.query('mine') === '1';
   let q = 'SELECT * FROM orders WHERE 1=1';
   const args: any[] = [];
-  if (mine) { q += ' AND (customer_id = ? OR worker_id = ?)'; args.push(user.id, user.id); }
+  if (mine || user.role !== 'admin') { q += ' AND (customer_id = ? OR worker_id = ?)'; args.push(user.id, user.id); }
   q += ' ORDER BY created_at DESC';
   const stmt = c.env.DB.prepare(q);
   const res = args.length ? await stmt.bind(...args).all() : await stmt.all();
@@ -368,7 +372,7 @@ app.post('/orders/:id/start', async (c) => {
   const order = await getOrder(c.env.DB, id);
   if (!order) return c.json({ error: 'Not found' }, 404);
   if (order.worker_id !== user.id) return c.json({ error: 'Forbidden' }, 403);
-  await c.env.DB.prepare('UPDATE orders SET status = "in_progress", updated_at = ? WHERE id = ?').bind(now(), id).run();
+  if (order.status !== 'in_progress' || order.escrow !== 'held') return c.json({ error: 'Payment required before starting' }, 400);
   return c.json({ ok: true });
 });
 
@@ -379,6 +383,7 @@ app.post('/orders/:id/deliver', async (c) => {
   const order = await getOrder(c.env.DB, id);
   if (!order) return c.json({ error: 'Not found' }, 404);
   if (order.worker_id !== user.id) return c.json({ error: 'Forbidden' }, 403);
+  if (order.status !== 'in_progress' || order.escrow !== 'held') return c.json({ error: 'Order is not ready for delivery' }, 400);
   await c.env.DB.prepare('UPDATE orders SET status = "delivered", updated_at = ? WHERE id = ?').bind(now(), id).run();
   await c.env.DB.prepare('INSERT INTO notifications (id, user_id, type, title, body, payload) VALUES (?, ?, "order", "Công việc đã hoàn thành", "Thợ đã đánh dấu hoàn thành, vui lòng xác nhận", ?)')
     .bind(genId('notif'), order.customer_id, JSON.stringify({ order_id: id })).run();
@@ -620,11 +625,16 @@ app.post('/push/subscribe', async (c) => {
 // ==================== UPLOADS ====================
 
 app.post('/uploads', async (c) => {
+  const user = await getAuthUser(c);
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
   const formData = await c.req.formData();
   const file = formData.get('file') as File | null;
   if (!file) return c.json({ error: 'No file' }, 400);
-  const key = `uploads/${Date.now()}_${file.name}`;
-  await c.env.PHOTOS.put(key, file.stream());
+  if (!file.type.startsWith('image/')) return c.json({ error: 'Only image files are allowed' }, 415);
+  if (file.size > 10 * 1024 * 1024) return c.json({ error: 'Image exceeds 10 MB limit' }, 413);
+  const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  const key = `uploads/${user.id}/${Date.now()}_${crypto.randomUUID()}.${extension}`;
+  await c.env.PHOTOS.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
   return c.json({ key }, 201);
 });
 
