@@ -1,5 +1,22 @@
+-- Idempotent demo seed: remove demo rows first, then reinsert them.
+DELETE FROM messages WHERE conversation_id IN (
+  SELECT id FROM conversations WHERE customer_id = 'usr_002'
+);
+DELETE FROM notifications WHERE user_id IN ('usr_001','usr_002','usr_003','usr_004','usr_005','usr_006');
+DELETE FROM conversations WHERE customer_id = 'usr_002';
+DELETE FROM transactions WHERE user_id IN ('usr_002','usr_003','usr_004','usr_005','usr_006');
+DELETE FROM reviews WHERE author_id IN ('usr_002','usr_003','usr_004','usr_005','usr_006');
+DELETE FROM bids WHERE id IN ('bid_001','bid_002');
+DELETE FROM orders WHERE id IN ('ord_001','ord_002');
+DELETE FROM jobs WHERE id IN ('job_001','job_002');
+DELETE FROM bookings WHERE id IN ('bk_001','bk_002');
+DELETE FROM worker_profiles WHERE user_id IN ('usr_003','usr_004','usr_005','usr_006');
+DELETE FROM passwords WHERE user_id IN ('usr_001','usr_002','usr_003','usr_004','usr_005','usr_006');
+DELETE FROM wallets WHERE user_id IN ('usr_003','usr_004','usr_005','usr_006');
+DELETE FROM users WHERE id IN ('usr_001','usr_002','usr_003','usr_004','usr_005','usr_006');
+
 -- 6 services
-INSERT OR IGNORE INTO services (id, slug, name, icon, base_price, unit, description) VALUES
+INSERT INTO services (id, slug, name, icon, base_price, unit, description) VALUES
   ('svc_1','dien','Điện','zap',150000,'lượt','Kiểm tra & sửa chữa điện dân dụng, thay ổ cắm, dây điện...'),
   ('svc_2','nuoc','Nước','droplet',180000,'lượt','Sửa ống nước, van, bồn rửa, toilet...'),
   ('svc_3','moc','Mộc','hammer',200000,'lượt','Sửa tủ, lắp đặt nội thất, đóng tủ...'),
