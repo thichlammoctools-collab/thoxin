@@ -78,5 +78,28 @@ label { user-select:none; display:block; font-size: 12px; font-weight: 700; colo
 a { color:var(--primary); text-decoration:none; }
 .empty-state { text-align:center; padding:48px 16px; color:var(--muted); }
 .empty-state .icon { font-size:40px; margin-bottom:12px; color: var(--primary); }
+
+/* List pages (jobs / workers) */
+.filter-bar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+.meta-line { font-size:12px; color: var(--muted); }
+.budget { color: var(--primary); font-weight: 800; font-size: 13px; line-height: 1.35; white-space: nowrap; }
+.job-icon { flex:none; width:42px; height:42px; border-radius:12px; background: var(--primary-soft); display:grid; place-items:center; font-size:20px; }
+.job-title { font-weight:700; font-size:14px; line-height:1.35; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chip-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px; scrollbar-width:none; }
+.chip-row::-webkit-scrollbar { display:none; }
+.chip { flex:none; display:inline-flex; align-items:center; gap:5px; padding:8px 14px; border-radius:999px; border:1px solid var(--border); background:var(--surface); font-size:13px; font-weight:700; color:var(--muted); cursor:pointer; min-height:36px; transition:border-color .15s ease, background .15s ease, color .15s ease; }
+.chip.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+.seg { display:flex; background:var(--surface-soft); border:1px solid var(--border); border-radius:999px; padding:3px; gap:2px; flex:none; }
+.seg button { flex:none; border:0; background:transparent; border-radius:999px; font-size:12px; font-weight:800; color:var(--muted); cursor:pointer; padding:7px 12px; min-height:32px; white-space:nowrap; transition:background .15s ease, color .15s ease; }
+.seg button.active { background:var(--surface); color:var(--primary); box-shadow:var(--shadow); }
+.rating-pill { display:inline-flex; align-items:center; gap:3px; background:var(--warning-soft); color:var(--warning); font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+.avatar-lg { width:48px; height:48px; border-radius:50%; background:var(--primary-soft); color:var(--primary); display:grid; place-items:center; font-weight:800; font-size:15px; flex:none; }
+.skill-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:5px; }
+.skill-chip { font-size:11px; font-weight:700; background:var(--surface-soft); border:1px solid var(--border); color:var(--muted); padding:2px 8px; border-radius:999px; }
+.fab { position:fixed; bottom:calc(76px + env(safe-area-inset-bottom)); right:16px; background:var(--accent); color:#fff; padding:14px 20px; border-radius:999px; text-decoration:none; font-weight:800; font-size:14px; box-shadow:0 8px 24px rgba(255,122,0,.35); z-index:45; transition:transform .18s ease, box-shadow .18s ease; }
+.fab:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(255,122,0,.4); }
+.map-box { height:62vh; min-height:320px; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; box-shadow:var(--shadow); z-index:1; background:#E8EEF5; }
+.map-box .leaflet-container { height:100%; width:100%; font:inherit; }
+.map-box .empty-state { display:flex; flex-direction:column; justify-content:center; height:100%; }
 @media (min-width: 768px) { #app, .app-root, .bottom-tabs { max-width: 680px; } .page { padding-left: 24px; padding-right: 24px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

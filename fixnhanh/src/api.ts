@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { genId, hashPassword, verifyPassword, signToken, verifyToken } from './auth';
 import { getUserByPhone, getUserById, getWorkerProfile, getService, getBooking, getJob, getOrder, getWallet, rows, row } from './db';
 import { COMMISSION_RATE } from './constants';
+import { geocodeAddress } from './geocode';
 
 const app = new Hono<{ Bindings: any }>();
 
@@ -255,12 +256,20 @@ app.post('/bookings/:id/status', async (c) => {
 app.post('/jobs', async (c) => {
   const user = await getAuthUser(c);
   if (!user) return c.json({ error: 'Unauthorized' }, 401);
-  const body = await c.req.json<{ title: string; description: string; category_slug: string; district: string; budget_min?: number; budget_max?: number; deadline?: string; photos?: string[] }>();
+  const body = await c.req.json<{ title: string; description: string; category_slug: string; district: string; address?: string; budget_min?: number; budget_max?: number; deadline?: string; photos?: string[] }>();
   if (!body.title || !body.district) return c.json({ error: 'Missing fields' }, 400);
   const id = genId('job');
   const photos = JSON.stringify(body.photos || []);
-  await c.env.DB.prepare('INSERT INTO jobs (id, customer_id, title, description, category_slug, district, budget_min, budget_max, deadline, photos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, user.id, body.title, body.description || '', body.category_slug, body.district, body.budget_min || 0, body.budget_max || 0, body.deadline || null, photos).run();
+  const address = (body.address || '').slice(0, 300);
+  await c.env.DB.prepare('INSERT INTO jobs (id, customer_id, title, description, category_slug, district, address, budget_min, budget_max, deadline, photos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, user.id, body.title, body.description || '', body.category_slug, body.district, address, body.budget_min || 0, body.budget_max || 0, body.deadline || null, photos).run();
+  // Geocode best-effort — không fail request nếu dịch vụ ngoài lỗi/chậm
+  if (address) {
+    const coords = await geocodeAddress(address, body.district);
+    if (coords) {
+      await c.env.DB.prepare('UPDATE jobs SET lat = ?, lng = ? WHERE id = ?').bind(coords.lat, coords.lng, id).run();
+    }
+  }
   return c.json({ id }, 201);
 });
 

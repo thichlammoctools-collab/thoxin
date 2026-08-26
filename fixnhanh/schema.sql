@@ -58,10 +58,17 @@ CREATE TABLE jobs (
   budget_min INTEGER DEFAULT 0,
   budget_max INTEGER DEFAULT 0,
   district TEXT NOT NULL,
+  address TEXT NOT NULL DEFAULT '',
+  lat REAL,
+  lng REAL,
   deadline TEXT,
   status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','assigned','in_progress','completed','paid','cancelled')),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Migration cho DB đã tạo trước khi có cột địa chỉ (chạy thủ công):
+--   ALTER TABLE jobs ADD COLUMN address TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE jobs ADD COLUMN lat REAL;
+--   ALTER TABLE jobs ADD COLUMN lng REAL;
 CREATE TABLE bids (
   id TEXT PRIMARY KEY,
   job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
