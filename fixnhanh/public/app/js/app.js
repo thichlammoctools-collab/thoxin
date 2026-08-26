@@ -298,8 +298,72 @@ if(portfolio.length){h+=`<h3 style="margin:16px 0 10px">Dự án đã làm (${po
 if(w.reviews?.length){h+=`<h3 style="margin:16px 0 10px">Đánh giá</h3>`;w.reviews.forEach(r=>h+=`<div class="card"><div style="font-weight:700">${r.rating}⭐</div><div style="font-size:13px;color:var(--muted)">${esc(r.comment||'')}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${fmtDate(r.created_at)}</div></div>`);}return shell(h,'Thợ');};
 
 // CHAT
-routes['/chat']=async()=>{const c=await api('/conversations');let h='<div style="display:flex;flex-direction:column;gap:8px">';if(!c.length)h+=`<p style="color:var(--muted);text-align:center;margin-top:24px">Chưa có tin nhắn nào</p>`;c.forEach(x=>h+=`<a href="#/chat/${x.id}" class="card" style="text-decoration:none;color:inherit"><div style="font-weight:700">Chat #${x.id.slice(-6)}</div><div style="font-size:12px;color:var(--muted)">${esc(x.last_message?.body?.slice(0,60)||'')}</div></a>`);h+='</div>';return shell(h,'Tin nhắn');};
-routes['/chat/:id']=async(id)=>{const m=await api(`/conversations/${id}/messages?limit=50`);let h=`<div id="chatThread" style="display:flex;flex-direction:column;gap:8px;margin-bottom:60px;max-height:60vh;overflow-y:auto">`;m.forEach(x=>{const mn=x.sender_id===state.user?.id;h+=`<div style="align-self:${mn?'flex-end':'flex-start'};background:${mn?'var(--primary)':'#fff'};color:${mn?'#fff':'var(--text)'};padding:10px 14px;border-radius:16px;max-width:80%;border:1px solid ${mn?'transparent':'var(--border)'}">${esc(x.body)}</div>`;});h+=`</div><form id="chatForm" style="position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:8px 16px;background:var(--surface);display:flex;gap:8px;border-top:1px solid var(--border)"><input class="input" name="body" placeholder="Nhắn tin..." style="flex:1;margin-bottom:0" required/><button class="btn btn-primary" type="submit" style="width:auto;padding:10px 16px">Gửi</button></form>`;setTimeout(()=>{const t=$('#chatThread');if(t)t.scrollTop=t.scrollHeight;const ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/api/ws/chat/${id}?token=${state.token}`);ws.onmessage=e=>{const x=JSON.parse(e.data);const t=$('#chatThread');if(!t)return;const mn=x.senderId===state.user?.id;const d=document.createElement('div');d.style.alignSelf=mn?'flex-end':'flex-start';d.style.background=mn?'var(--primary)':'#fff';d.style.color=mn?'#fff':'var(--text)';d.style.padding='10px 14px';d.style.borderRadius='16px';d.style.maxWidth='80%';d.style.border='1px solid '+(mn?'transparent':'var(--border)');d.textContent=x.body;t.appendChild(d);t.scrollTop=t.scrollHeight;};},0);return shell(h,'Tin nhắn');};
+routes['/chat']=async()=>{
+  const c=await api('/conversations').catch(()=>null);
+  let h='<div style="display:flex;flex-direction:column;gap:8px">';
+  if(!c||!c.length)h+=`<div class="empty-state"><div class="icon">💬</div><p>Chưa có tin nhắn nào.</p><p style="font-size:13px;margin-top:4px">Hội thoại sẽ xuất hiện sau khi bạn đặt lịch hoặc nhận việc.</p></div>`;
+  else c.forEach(x=>{
+    const lm=x.last_message;
+    h+=`<a href="#/chat/${x.id}" class="card" style="text-decoration:none;color:inherit;display:flex;gap:12px;align-items:center;padding:12px">
+      <span class="avatar-lg">${esc(initials(x.other_name))}</span>
+      <span style="flex:1;min-width:0">
+        <span style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+          <span class="job-title">${esc(x.other_name||'Người dùng')}</span>
+          ${lm?`<span class="meta-line" style="flex:none;font-size:11px">${fmtDate(lm.created_at)}</span>`:''}
+        </span>
+        <span class="meta-line" style="display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lm?(lm.attachment_url&&!lm.body?'📎 Ảnh':esc(lm.body)):'Bắt đầu trò chuyện'}</span>
+      </span>
+    </a>`;
+  });
+  h+='</div>';
+  return shell(h,'Tin nhắn');
+};
+routes['/chat/:id']=async(id)=>{
+  // Tiêu đề phòng = tên đối phương
+  setTimeout(async()=>{
+    const info=await api(`/conversations/${id}`).catch(()=>null);
+    if(info?.other_name){const t=document.querySelector('.top-bar h1');if(t)t.textContent=info.other_name;}
+  },0);
+  let h=`<div id="chatThread" style="display:flex;flex-direction:column;gap:8px;margin-bottom:70px;max-height:60vh;overflow-y:auto;padding-right:4px">`;
+  try{
+    const m=await api(`/conversations/${id}/messages?limit=50`);
+    [...m].reverse().forEach(x=>h+=chatBubble(x));
+  }catch(err){h+=`<p style="color:var(--danger);text-align:center">${esc(err.message)}</p>`;}
+  h+=`</div><form id="chatForm" style="position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:680px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--surface);display:flex;gap:6px;border-top:1px solid var(--border);z-index:41">
+    <label class="btn-icon chat-attach-btn" title="Gửi ảnh" aria-label="Gửi ảnh đính kèm">📎<input type="file" id="chatPhoto" accept="image/*" hidden/></label>
+    <input class="input" name="body" placeholder="Nhắn tin..." style="flex:1;margin-bottom:0" autocomplete="off"/>
+    <button class="btn btn-primary" type="submit" style="width:auto;padding:10px 16px">Gửi</button>
+  </form>`;
+  setTimeout(()=>{
+    const t=$('#chatThread');if(t)t.scrollTop=t.scrollHeight;
+    const ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/api/ws/chat/${id}?token=${state.token}`);
+    ws.onmessage=e=>{try{const x=JSON.parse(e.data);const th=$('#chatThread');if(!th)return;if(th.querySelector(`[data-msg-id="${x.id}"]`))return;th.insertAdjacentHTML('beforeend',chatBubble(x));th.scrollTop=th.scrollHeight;}catch{}};
+    wsRef&&wsRef.close&&wsRef.close();wsRef=ws;
+    $('#chatPhoto')?.addEventListener('change',async ev=>{
+      const file=ev.target.files?.[0];if(!file)return;
+      if(!file.type.startsWith('image/'))return toast('Chỉ hỗ trợ ảnh');
+      toast('Đang gửi ảnh…');
+      try{const fd=new FormData();fd.append('file',file);const u=await api('/uploads',{method:'POST',body:fd});
+        await api(`/conversations/${id}/messages`,{method:'POST',body:JSON.stringify({body:'',attachment_url:u.key})});
+      }catch(err){toast('Gửi ảnh thất bại');}
+      ev.target.value='';
+    });
+  },0);
+  return shell(h,'Tin nhắn');
+};
+let wsRef=null;
+function chatBubble(x){
+  // Chuẩn hóa: REST trả snake_case, WS broadcast trả camelCase
+  const sid=x.sender_id||x.senderId;
+  const url=x.attachment_url||x.attachmentUrl;
+  const ts=x.created_at;
+  const mn=sid===state.user?.id;
+  const img=url?`<img src="${esc(photoUrl(url))}" alt="Ảnh đính kèm" loading="lazy" style="display:block;max-width:200px;border-radius:10px;margin-bottom:${x.body?6:0};cursor:pointer" onclick="window.open(this.src,'_blank')"/>`:'';
+  return `<div data-msg-id="${esc(x.id)}" style="align-self:${mn?'flex-end':'flex-start'};max-width:80%">
+    <div style="background:${mn?'var(--primary)':'#fff'};color:${mn?'#fff':'var(--text)'};padding:9px 13px;border-radius:16px;${mn?'border-bottom-right-radius:5px':'border-bottom-left-radius:5px'};box-shadow:var(--shadow)">${img}${x.body?`<span style="font-size:14px;line-height:1.45;word-break:break-word">${esc(x.body)}</span>`:''}</div>
+    <div class="meta-line" style="font-size:10px;margin:3px 4px 0;${mn?'text-align:right':'text-align:left'}">${fmtDate(ts)}</div>
+  </div>`;
+}
 
 // NOTIFICATIONS
 routes['/notifications']=async()=>{const n=await api('/notifications');let h='<div style="display:flex;flex-direction:column;gap:8px">';if(!n.length)h+=`<p style="color:var(--muted);text-align:center;margin-top:24px">Không có thông báo</p>`;n.forEach(x=>h+=`<div class="card" style="opacity:${x.read_at?0.6:1}"><div style="font-weight:700">${esc(x.title)}</div><div style="font-size:13px;color:var(--muted)">${esc(x.body)}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${fmtDate(x.created_at)}</div></div>`);h+='</div><button class="btn btn-outline read-all-btn" style="margin-top:16px">Đánh dấu tất cả đã đọc</button>';return shell(h,'Thông báo');};
@@ -466,7 +530,7 @@ function bindEvents(){
   });
   document.querySelectorAll('[data-rm-portfolio]').forEach(b=>b.addEventListener('click',()=>{editPortfolio.splice(Number(b.dataset.rmPortfolio),1);renderPortfolioEditor();}));
   $('#becomeForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const skills=[...e.target.querySelectorAll('input[name="skills"]:checked')].map(i=>i.value);const districts=[...e.target.querySelectorAll('input[name="districts"]:checked')].map(i=>i.value);try{await api('/become-worker',{method:'POST',body:JSON.stringify({bio:f.get('bio'),skills,districts,years_exp:Number(f.get('years_exp')||0),cccd_last4:f.get('cccd_last4')})});const me=await api('/me');state.user=me;localStorage.setItem('user',JSON.stringify(me));toast('Đăng ký thợ thành công!');location.hash='#/profile';}catch(err){toast(err.message);}});
-  $('#chatForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const convoId=location.hash.split('/')[2];try{await api(`/conversations/${convoId}/messages`,{method:'POST',body:JSON.stringify({body:f.get('body')})});e.target.reset();}catch(err){toast(err.message);}});
+  $('#chatForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const text=String(f.get('body')||'').trim();if(!text)return;const convoId=location.hash.split('/')[2];try{await api(`/conversations/${convoId}/messages`,{method:'POST',body:JSON.stringify({body:text})});e.target.reset();}catch(err){toast(err.message);}});
   // Support: char counters
   document.querySelectorAll('.char-counter[data-for]').forEach(c=>{
     const input=document.getElementById(c.dataset.for);if(!input)return;

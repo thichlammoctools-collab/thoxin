@@ -37,8 +37,8 @@ export class ChatDO extends DurableObject<Env> {
       const msgId = genId('msg');
       const createdAt = new Date().toISOString();
       await this.env.DB.batch([
-        this.env.DB.prepare('INSERT INTO messages (id, conversation_id, sender_id, body, attachment_url) VALUES (?, ?, ?, ?, ?)')
-          .bind(msgId, conversationId, userId, parsed.body, null),
+        this.env.DB.prepare('INSERT INTO messages (id, conversation_id, sender_id, body, attachment_url, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(msgId, conversationId, userId, parsed.body, null, createdAt),
         this.env.DB.prepare('UPDATE conversations SET last_message_at = ? WHERE id = ?').bind(createdAt, conversationId)
       ]);
       await this.broadcastMessage({

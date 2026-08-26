@@ -608,13 +608,39 @@ app.post('/worker/payout-request', async (c) => {
 app.get('/conversations', async (c) => {
   const user = await getAuthUser(c);
   if (!user) return c.json({ error: 'Unauthorized' }, 401);
-  const convos = await c.env.DB.prepare('SELECT * FROM conversations WHERE customer_id = ? OR worker_id = ? ORDER BY last_message_at DESC').bind(user.id, user.id).all();
+  const convos = await c.env.DB.prepare(`
+    SELECT cv.*, cu.name AS customer_name, wu.name AS worker_name
+    FROM conversations cv
+    JOIN users cu ON cu.id = cv.customer_id
+    JOIN users wu ON wu.id = cv.worker_id
+    WHERE cv.customer_id = ? OR cv.worker_id = ?
+    ORDER BY COALESCE(cv.last_message_at, cv.created_at) DESC`).bind(user.id, user.id).all();
   const result = [];
   for (const convo of rows(convos) as any[]) {
     const lastMsg = await c.env.DB.prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1').bind(convo.id).first();
-    result.push({ ...convo, last_message: lastMsg || null });
+    result.push({
+      ...convo,
+      other_name: convo.customer_id === user.id ? convo.worker_name : convo.customer_name,
+      last_message: lastMsg || null
+    });
   }
   return c.json(result);
+});
+
+// Chi tiết hội thoại (chỉ thành viên) — dùng cho tiêu đề phòng chat
+app.get('/conversations/:id', async (c) => {
+  const user = await getAuthUser(c);
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  const id = c.req.param('id');
+  const convo = await c.env.DB.prepare(`
+    SELECT cv.*, cu.name AS customer_name, wu.name AS worker_name
+    FROM conversations cv
+    JOIN users cu ON cu.id = cv.customer_id
+    JOIN users wu ON wu.id = cv.worker_id
+    WHERE cv.id = ?`).bind(id).first() as any;
+  if (!convo) return c.json({ error: 'Not found' }, 404);
+  if (convo.customer_id !== user.id && convo.worker_id !== user.id) return c.json({ error: 'Forbidden' }, 403);
+  return c.json({ ...convo, other_name: convo.customer_id === user.id ? convo.worker_name : convo.customer_name });
 });
 
 app.get('/conversations/:id/messages', async (c) => {
@@ -643,11 +669,13 @@ app.post('/conversations/:id/messages', async (c) => {
   if (!convo) return c.json({ error: 'Not found' }, 404);
   if ((convo as any).customer_id !== user.id && (convo as any).worker_id !== user.id) return c.json({ error: 'Forbidden' }, 403);
   const body = await c.req.json<{ body: string; attachment_url?: string }>();
-  if (!body.body) return c.json({ error: 'Missing body' }, 400);
+  // Cho phép tin chỉ có ảnh (body rỗng nhưng có attachment)
+  if (!body.body?.trim() && !body.attachment_url) return c.json({ error: 'Missing body' }, 400);
   const msgId = genId('msg');
   const ts = now();
   await c.env.DB.batch([
-    c.env.DB.prepare('INSERT INTO messages (id, conversation_id, sender_id, body, attachment_url) VALUES (?, ?, ?, ?, ?)').bind(msgId, id, user.id, body.body, body.attachment_url || null),
+    // created_at ms-precision để tin nhắn trong cùng một giây vẫn đúng thứ tự
+    c.env.DB.prepare('INSERT INTO messages (id, conversation_id, sender_id, body, attachment_url, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(msgId, id, user.id, body.body?.trim() || '', body.attachment_url || null, ts),
     c.env.DB.prepare('UPDATE conversations SET last_message_at = ? WHERE id = ?').bind(ts, id)
   ]);
   const otherParty = (convo as any).customer_id === user.id ? (convo as any).worker_id : (convo as any).customer_id;

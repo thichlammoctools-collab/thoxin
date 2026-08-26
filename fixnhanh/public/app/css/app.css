@@ -113,5 +113,10 @@ a { color:var(--primary); text-decoration:none; }
 .ticket-card[open] .ticket-chevron { transform:rotate(180deg); }
 .ticket-card[open] summary { margin-bottom:2px; }
 .sos-seg-btn.active, [data-cat="urgent"].active { background:var(--danger)!important; border-color:var(--danger)!important; color:#fff!important; }
+
+/* Chat */
+.chat-attach-btn { display:inline-grid; place-items:center; width:44px; min-height:44px; border-radius:var(--radius-sm); background:var(--surface-soft); border:1px solid var(--border); cursor:pointer; font-size:17px; margin-bottom:0; }
+.chat-attach-btn:hover { background:var(--primary-soft); }
+#chatThread { scroll-behavior:smooth; }
 @media (min-width: 768px) { #app, .app-root, .bottom-tabs { max-width: 680px; } .page { padding-left: 24px; padding-right: 24px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
