@@ -3,6 +3,7 @@ import { landing } from './landing';
 import { api } from './api';
 import { admin } from './admin';
 import { ChatDO } from './chat';
+import { runPayoutBatch, vnToday } from './payouts';
 import type { Env } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -24,5 +25,11 @@ app.get('/photos/*', async (c) => {
   }
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Cron hằng ngày 00:15 giờ VN: nếu hôm nay là ngày thanh toán cấu hình thì chi trả các payout 'pending'
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runPayoutBatch(env.DB, vnToday()));
+  }
+} as ExportedHandler<Env>;
 export { ChatDO };

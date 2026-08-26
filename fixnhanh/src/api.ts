@@ -3,6 +3,25 @@ import { genId, hashPassword, verifyPassword, signToken, verifyToken } from './a
 import { getUserByPhone, getUserById, getWorkerProfile, getService, getBooking, getJob, getOrder, getWallet, rows, row } from './db';
 import { COMMISSION_RATE } from './constants';
 import { geocodeAddress } from './geocode';
+import { SKILLS, DISTRICTS_HCM } from './constants';
+import { getPayoutConfig, savePayoutConfig, runPayoutBatch, processInstantPayout, vnToday, DEFAULT_PAYOUT_CONFIG, type PayoutConfig } from './payouts';
+
+const DEFAULT_INSTANT_FEE = DEFAULT_PAYOUT_CONFIG.instant_fee_percent;
+
+const VALID_SKILLS = SKILLS as readonly string[];
+const VALID_DISTRICTS = DISTRICTS_HCM as readonly string[];
+
+function cleanProfileInput(body: { skills?: string[]; districts?: string[]; portfolio?: string[]; cccd_last4?: string }) {
+  return {
+    skills: (Array.isArray(body.skills) ? body.skills : []).filter((s): s is string => typeof s === 'string' && VALID_SKILLS.includes(s)),
+    districts: (Array.isArray(body.districts) ? body.districts : []).filter((d): d is string => typeof d === 'string' && VALID_DISTRICTS.includes(d)),
+    // Portfolio: tối đa 12 mục, mỗi mục là photo key (/api/photos/<key>) hoặc URL ảnh
+    portfolio: (Array.isArray(body.portfolio) ? body.portfolio : [])
+      .filter((u): u is string => typeof u === 'string' && u.length > 0 && u.length <= 300)
+      .slice(0, 12),
+    cccd_last4: String(body.cccd_last4 || '').replace(/\D/g, '').slice(-4)
+  };
+}
 
 const app = new Hono<{ Bindings: any }>();
 
@@ -116,17 +135,20 @@ app.get('/workers/:id', async (c) => {
 app.post('/worker/profile', async (c) => {
   const user = await getAuthUser(c);
   if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  if (user.role !== 'worker') return c.json({ error: 'Only workers can update worker profile' }, 403);
   const body = await c.req.json<{ bio?: string; skills?: string[]; districts?: string[]; years_exp?: number; cccd_last4?: string; portfolio?: string[] }>();
-  const skills = JSON.stringify(body.skills || []);
-  const districts = JSON.stringify(body.districts || []);
-  const portfolio = JSON.stringify(body.portfolio || []);
+  const clean = cleanProfileInput(body);
+  const skills = JSON.stringify(clean.skills);
+  const districts = JSON.stringify(clean.districts);
+  const portfolio = JSON.stringify(clean.portfolio);
+  const verified = clean.cccd_last4.length === 4 ? 1 : 0;
   const existing = await getWorkerProfile(c.env.DB, user.id);
   if (existing) {
-    await c.env.DB.prepare('UPDATE worker_profiles SET bio = ?, skills = ?, districts = ?, years_exp = ?, cccd_last4 = ?, cccd_verified = 1, portfolio = ? WHERE user_id = ?')
-      .bind(body.bio || '', skills, districts, body.years_exp || 0, body.cccd_last4 || '', portfolio, user.id).run();
+    await c.env.DB.prepare('UPDATE worker_profiles SET bio = ?, skills = ?, districts = ?, years_exp = ?, cccd_last4 = ?, cccd_verified = ?, portfolio = ? WHERE user_id = ?')
+      .bind(String(body.bio || '').slice(0, 2000), skills, districts, Math.max(0, Math.min(60, Number(body.years_exp) || 0)), clean.cccd_last4, verified, portfolio, user.id).run();
   } else {
-    await c.env.DB.prepare('INSERT INTO worker_profiles (user_id, bio, skills, districts, years_exp, cccd_last4, cccd_verified, portfolio) VALUES (?, ?, ?, ?, ?, ?, 1, ?)')
-      .bind(user.id, body.bio || '', skills, districts, body.years_exp || 0, body.cccd_last4 || '', portfolio).run();
+    await c.env.DB.prepare('INSERT INTO worker_profiles (user_id, bio, skills, districts, years_exp, cccd_last4, cccd_verified, portfolio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(user.id, String(body.bio || '').slice(0, 2000), skills, districts, Math.max(0, Math.min(60, Number(body.years_exp) || 0)), clean.cccd_last4, verified, portfolio).run();
   }
   const profile = await getWorkerProfile(c.env.DB, user.id);
   return c.json(profile);
@@ -136,15 +158,17 @@ app.post('/become-worker', async (c) => {
   const user = await getAuthUser(c);
   if (!user) return c.json({ error: 'Unauthorized' }, 401);
   const body = await c.req.json<{ bio?: string; skills?: string[]; districts?: string[]; years_exp?: number; cccd_last4?: string }>();
-  const skills = JSON.stringify(body.skills || []);
-  const districts = JSON.stringify(body.districts || []);
+  const clean = cleanProfileInput(body);
+  const skills = JSON.stringify(clean.skills);
+  const districts = JSON.stringify(clean.districts);
+  const verified = clean.cccd_last4.length === 4 ? 1 : 0;
   const existing = await getWorkerProfile(c.env.DB, user.id);
   if (existing) {
-    await c.env.DB.prepare('UPDATE worker_profiles SET bio = ?, skills = ?, districts = ?, years_exp = ?, cccd_last4 = ?, cccd_verified = 1 WHERE user_id = ?')
-      .bind(body.bio || '', skills, districts, body.years_exp || 0, body.cccd_last4 || '', user.id).run();
+    await c.env.DB.prepare('UPDATE worker_profiles SET bio = ?, skills = ?, districts = ?, years_exp = ?, cccd_last4 = ?, cccd_verified = ? WHERE user_id = ?')
+      .bind(String(body.bio || '').slice(0, 2000), skills, districts, Math.max(0, Math.min(60, Number(body.years_exp) || 0)), clean.cccd_last4, verified, user.id).run();
   } else {
-    await c.env.DB.prepare('INSERT INTO worker_profiles (user_id, bio, skills, districts, years_exp, cccd_last4, cccd_verified) VALUES (?, ?, ?, ?, ?, ?, 1)')
-      .bind(user.id, body.bio || '', skills, districts, body.years_exp || 0, body.cccd_last4 || '').run();
+    await c.env.DB.prepare('INSERT INTO worker_profiles (user_id, bio, skills, districts, years_exp, cccd_last4, cccd_verified) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(user.id, String(body.bio || '').slice(0, 2000), skills, districts, Math.max(0, Math.min(60, Number(body.years_exp) || 0)), clean.cccd_last4, verified).run();
   }
   await c.env.DB.prepare('UPDATE users SET role = "worker" WHERE id = ?').bind(user.id).run();
   const profile = await getWorkerProfile(c.env.DB, user.id);
@@ -533,6 +557,52 @@ app.post('/wallet/withdraw', async (c) => {
   return c.json({ ok: true });
 });
 
+// ==================== PAYOUTS (RÚT TIỀN THEO NGƯỠNG + LỊCH CỐ ĐỊNH) ====================
+
+// Thợ: xem cấu hình + số dư + lịch sử yêu cầu rút
+app.get('/worker/payouts', async (c) => {
+  const user = await getAuthUser(c);
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  const config = await getPayoutConfig(c.env.DB);
+  const wallet = await getWallet(c.env.DB, user.id) || { user_id: user.id, available: 0, pending: 0 };
+  const history = await c.env.DB.prepare('SELECT id, amount, status, created_at, paid_at FROM payouts WHERE worker_id = ? ORDER BY created_at DESC').bind(user.id).all();
+  return c.json({ config, available: wallet.available, pending: wallet.pending, payouts: rows(history) });
+});
+
+// Thợ: tạo yêu cầu rút — phải đạt ngưỡng tối thiểu admin cấu hình.
+// mode 'instant': nhận ngay sau khi trừ phí; mode 'scheduled' (mặc định): chờ ngày thanh toán cố định.
+app.post('/worker/payout-request', async (c) => {
+  const user = await getAuthUser(c);
+  if (!user || user.role !== 'worker') return c.json({ error: 'Only workers can request payout' }, 403);
+  const body = await c.req.json<{ amount?: number; note?: string; mode?: string }>();
+  const config = await getPayoutConfig(c.env.DB);
+  const mode = body.mode === 'instant' ? 'instant' : 'scheduled';
+  const amount = Math.floor(Number(body.amount) || 0);
+  if (amount < config.min_payout) return c.json({ error: `Số tiền rút tối thiểu là ${config.min_payout}đ`, min_payout: config.min_payout }, 400);
+  let wallet = await getWallet(c.env.DB, user.id);
+  if (!wallet) {
+    await c.env.DB.prepare('INSERT INTO wallets (user_id) VALUES (?)').bind(user.id).run();
+    wallet = { user_id: user.id, available: 0, pending: 0 };
+  }
+  if (wallet.available < amount) return c.json({ error: 'Insufficient funds' }, 402);
+
+  if (mode === 'instant') {
+    const result = await processInstantPayout(c.env.DB, user.id, amount, config.instant_fee_percent, String(body.note || ''));
+    return c.json({ ok: true, mode, amount, fee: result.fee, received: result.received, status: 'paid', payout_id: result.payout_id }, 201);
+  }
+
+  // Chế độ định kỳ (miễn phí): chỉ một yêu cầu chờ tại một thời điểm
+  const existingPending = await c.env.DB.prepare("SELECT id FROM payouts WHERE worker_id = ? AND status = 'pending'").bind(user.id).first();
+  if (existingPending) return c.json({ error: 'Bạn đã có yêu cầu rút đang chờ xử lý' }, 409);
+  // Giữ tiền ngay: available -> pending để tránh chi tiêu đúp
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE wallets SET available = available - ?, pending = pending + ? WHERE user_id = ?').bind(amount, amount, user.id),
+    c.env.DB.prepare('INSERT INTO payouts (id, worker_id, amount, note) VALUES (?, ?, ?, ?)')
+      .bind(genId('pay'), user.id, amount, String(body.note || '').slice(0, 200))
+  ]);
+  return c.json({ ok: true, mode, amount, status: 'pending', next_payout_days: config.payout_days }, 201);
+});
+
 // ==================== CHAT ====================
 
 app.get('/conversations', async (c) => {
@@ -656,8 +726,8 @@ app.post('/uploads', async (c) => {
 });
 
 app.get('/photos/*', async (c) => {
-  // Key dạng "uploads/..." — lấy toàn bộ phần sau /photos/
-  const key = c.req.path.replace(/^\/photos\//, '');
+  // Mount tại /api nên path là "/api/photos/<key>" — cắt cả hai dạng prefix
+  const key = c.req.path.replace(/^\/(api\/)?photos\//, '');
   if (!key) return c.json({ error: 'Not found' }, 404);
   const obj = await c.env.PHOTOS.get(key);
   if (!obj) return c.json({ error: 'Not found' }, 404);
@@ -721,6 +791,51 @@ async function updateAdminUserStatus(c: any, status: 'active' | 'blocked') {
 
 app.post('/admin/users/:id/block', (c) => updateAdminUserStatus(c, 'blocked'));
 app.post('/admin/users/:id/unblock', (c) => updateAdminUserStatus(c, 'active'));
+
+// Cấu hình payout: ngưỡng tối thiểu + các ngày thanh toán cố định hàng tháng
+app.get('/admin/payout-settings', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
+  return c.json(await getPayoutConfig(c.env.DB));
+});
+
+app.put('/admin/payout-settings', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
+  const body = await c.req.json<{ min_payout?: number; payout_days?: number[]; instant_fee_percent?: number }>();
+  const minPayout = Math.max(0, Math.floor(Number(body.min_payout) || 0));
+  const feePercent = Math.min(50, Math.max(0, Number(body.instant_fee_percent ?? DEFAULT_INSTANT_FEE)));
+  const days = [...new Set((Array.isArray(body.payout_days) ? body.payout_days : [])
+    .map(n => Math.floor(Number(n)))
+    .filter(n => Number.isInteger(n) && n >= 1 && n <= 28))].sort((a, b) => a - b);
+  if (!days.length) return c.json({ error: 'payout_days phải chứa ít nhất một ngày từ 1 đến 28' }, 400);
+  const config: PayoutConfig = { min_payout: minPayout, payout_days: days, instant_fee_percent: feePercent };
+  await savePayoutConfig(c.env.DB, config);
+  return c.json(config);
+});
+
+// Danh sách yêu cầu rút (lọc theo status tùy chọn)
+app.get('/admin/payouts', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
+  const status = c.req.query('status');
+  if (status && !['pending', 'paid', 'rejected'].includes(status)) return c.json({ error: 'Invalid status' }, 400);
+  let q = 'SELECT p.*, u.name as worker_name, u.phone as worker_phone FROM payouts p JOIN users u ON u.id = p.worker_id';
+  const args: any[] = [];
+  if (status) { q += ' WHERE p.status = ?'; args.push(status); }
+  q += ' ORDER BY p.created_at DESC LIMIT 200';
+  return c.json(rows(await c.env.DB.prepare(q).bind(...args).all()));
+});
+
+// Chạy batch thanh toán cho một ngày (cron tự gọi hàm này; endpoint để admin kiểm tra/ép chạy)
+app.post('/admin/payouts/run', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
+  const body = await c.req.json<{ date?: string }>().catch(() => ({ date: undefined }));
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.date || '')) ? String(body.date) : vnToday();
+  const result = await runPayoutBatch(c.env.DB, date);
+  return c.json({ date, ...result });
+});
 
 // ==================== DEV SEED ====================
 

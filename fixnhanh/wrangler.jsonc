@@ -33,5 +33,9 @@
       "tag": "v1",
       "new_sqlite_classes": ["ChatDO"]
     }
-  ]
+  ],
+  // Chạy hằng ngày 00:15 giờ Việt Nam (17:15 UTC) — xử lý payout vào ngày cố định hàng tháng
+  "triggers": {
+    "crons": ["15 17 * * *"]
+  }
 }

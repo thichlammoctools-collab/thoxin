@@ -30,8 +30,22 @@ export async function getUserById(db: D1Database, id: string): Promise<User | un
   return (await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first()) ?? undefined;
 }
 
+function safeJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value !== 'string' || !value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getWorkerProfile(db: D1Database, userId: string): Promise<WorkerProfile | undefined> {
-  return (await db.prepare('SELECT * FROM worker_profiles WHERE user_id = ?').bind(userId).first()) ?? undefined;
+  const p = await db.prepare('SELECT * FROM worker_profiles WHERE user_id = ?').bind(userId).first() as any;
+  if (!p) return undefined;
+  // Trả skills/districts/portfolio dạng mảng cho mọi consumer (DB lưu chuỗi JSON)
+  return { ...p, skills: safeJsonArray(p.skills), districts: safeJsonArray(p.districts), portfolio: safeJsonArray(p.portfolio) } as WorkerProfile;
 }
 
 export async function getService(db: D1Database, id: string): Promise<Service | undefined> {

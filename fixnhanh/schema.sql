@@ -150,6 +150,24 @@ CREATE TABLE push_subscriptions (
 
 -- Indexes
 CREATE INDEX idx_worker_profiles ON worker_profiles(rating_avg DESC, jobs_done DESC);
+
+-- Cấu hình hệ thống (JSON trong settings.value), ví dụ payout_config:
+--   {"min_payout":500000,"payout_days":[15]}
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+-- Yêu cầu rút tiền của thợ. Tiền bị chuyển available -> pending ngay khi tạo yêu cầu,
+-- chỉ thực chuyển (mock) vào ngày thanh toán cố định trong tháng.
+CREATE TABLE IF NOT EXISTS payouts (
+  id TEXT PRIMARY KEY,
+  worker_id TEXT NOT NULL REFERENCES users(id),
+  amount INTEGER NOT NULL CHECK(amount > 0),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','rejected')),
+  note TEXT DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  paid_at TEXT
+);
 CREATE INDEX idx_bookings_customer ON bookings(customer_id, created_at DESC);
 CREATE INDEX idx_bookings_worker ON bookings(worker_id, created_at DESC);
 CREATE INDEX idx_jobs_status ON jobs(status, created_at DESC);
