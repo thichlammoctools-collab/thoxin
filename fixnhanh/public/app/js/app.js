@@ -367,6 +367,55 @@ routes['/become-worker']=async()=>{return shell(`<form id="becomeForm"><p style=
 // ADMIN
 routes['/admin']=async()=>{const s=await api('/admin/stats');let h=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"><div class="card"><div style="font-size:12px;color:var(--muted)">Người dùng</div><div style="font-size:24px;font-weight:800">${s.users}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Thợ</div><div style="font-size:24px;font-weight:800">${s.workers}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Đơn hàng</div><div style="font-size:24px;font-weight:800">${s.orders}</div></div><div class="card"><div style="font-size:12px;color:var(--muted)">Doanh thu</div><div style="font-size:20px;font-weight:800">${fmt(s.revenue)}</div></div></div><h3 style="margin:24px 0 12px">Người dùng</h3><div id="userList" style="display:flex;flex-direction:column;gap:8px"></div>`;setTimeout(async()=>{const l=$('#userList');if(!l)return;const u=await api('/admin/users');u.forEach(x=>{const d=document.createElement('div');d.className='card';d.style.display='flex';d.style.justifyContent='space-between';d.style.alignItems='center';d.innerHTML=`<div><div style="font-weight:700">${esc(x.name)}</div><div style="font-size:12px;color:var(--muted)">${x.phone}·${x.role}·${x.status}</div></div><button class="btn ${x.status==='active'?'btn-outline':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:12px" data-userid="${x.id}" data-action="${x.status==='active'?'block':'unblock'}">${x.status==='active'?'Khóa':'Mở khóa'}</button>`;l.appendChild(d);});},0);return shell(h,'Quản trị');};
 
+// SUPPORT — Hỗ trợ & khẩn cấp
+routes['/support']=async()=>{
+  let tickets=null;
+  try{tickets=await api('/support');}catch{}
+  const urgentOpen=(tickets||[]).filter(t=>t.category==='urgent'&&t.status==='open').length;
+  let h=`<div class="card support-banner" id="supportBanner">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:20px">🚨</span><b style="color:var(--danger)">Hỗ trợ khẩn cấp</b>
+    ${urgentOpen?`<span class="rating-pill" style="background:var(--danger);color:#fff">${urgentOpen} đang khẩn</span>`:''}</div>
+    <p class="meta-line" style="margin-bottom:10px">Sự cố nguy hiểm (cháy, rò điện/nước nghiêm trọng, tranh chấp tại chỗ...)? Admin sẽ nhận thông báo ngay lập tức.</p>
+  </div>
+  <form id="supportForm" class="support-form" novalidate>
+    <input type="hidden" name="category" id="supportCategory" value="general"/>
+    <div class="seg" role="group" aria-label="Mức độ hỗ trợ" style="margin-bottom:14px">
+      <button type="button" data-cat="general" class="active">💬 Thông thường</button>
+      <button type="button" data-cat="urgent" style="color:var(--danger);font-weight:800">🚨 Khẩn cấp</button>
+    </div>
+    <label for="spSubject">Tiêu đề</label>
+    <input class="input" id="spSubject" name="subject" placeholder="VD: Thợ chưa đến, sự cố điện..." maxlength="200" required/>
+    <div class="char-counter" data-for="spSubject">0/200</div>
+    <label for="spMessage">Mô tả chi tiết</label>
+    <textarea class="input" id="spMessage" name="message" rows="4" placeholder="Mô tả vấn đề, địa chỉ và mức độ khẩn cấp nếu có..." maxlength="3000" required></textarea>
+    <div class="char-counter" data-for="spMessage">0/3000</div>
+    <label for="spPhone">Số điện thoại liên hệ</label>
+    <input class="input" id="spPhone" name="contact_phone" inputmode="tel" placeholder="(Tùy chọn — mặc định dùng SĐT tài khoản)" value="${esc(state.user?.phone||'')}"/>
+    <button class="btn btn-primary support-submit-btn" type="submit">Gửi yêu cầu hỗ trợ</button>
+  </form>`;
+  h+=`<h3 style="margin:22px 0 10px">Yêu cầu của bạn</h3><div id="ticketHistory">${tickets?renderTicketList(tickets):skeletonRows(3,72)}</div>`;
+  return shell(h,'Hỗ trợ');
+};
+
+function renderTicketList(tickets){
+  if(!Array.isArray(tickets))return '';
+  if(!tickets.length)return `<div class="empty-state"><div class="icon">📭</div><p>Chưa có yêu cầu hỗ trợ nào.</p></div>`;
+  const stBadge=s=>s==='open'?'<span class="rating-pill">Đang xử lý</span>':'<span class="rating-pill" style="background:var(--success-soft);color:var(--success)">Đã xong ✓</span>';
+  return '<div style="display:flex;flex-direction:column;gap:8px">'+tickets.map((t,i)=>{
+    const urgent=t.category==='urgent';
+    return `<details class="card ticket-card" style="padding:12px;margin:0;${urgent?'border-left:3px solid var(--danger)':''}" data-open="${i===0&&urgent?1:0}">
+      <summary style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;list-style:none">
+        <span style="font-weight:700;font-size:13px;min-width:0">${urgent?'🔴 ':''}${esc(t.subject)}</span>
+        <span style="display:flex;align-items:center;gap:8px;flex:none">${stBadge(t.status)}<span class="meta-line ticket-chevron">▾</span></span>
+      </summary>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">
+        <p style="font-size:13px;line-height:1.55;margin:0 0 8px">${esc(t.message)}</p>
+        <div class="meta-line">Gửi lúc ${fmtDate(t.created_at)}${t.status==='resolved'?' · Đã xử lý lúc '+fmtDate(t.resolved_at):''}</div>
+      </div>
+    </details>`;
+  }).join('')+'</div>';
+}
+
 // 404
 routes['*']=async()=>shell(`<div style="text-align:center;padding:48px 16px"><div style="font-size:48px">🤷</div><p style="color:var(--muted);margin-top:16px">Không tìm thấy trang</p><a href="#/home" class="btn btn-primary" style="margin-top:16px;display:inline-block;width:auto">Về trang chủ</a></div>`,'Lỗi');
 
@@ -418,6 +467,36 @@ function bindEvents(){
   document.querySelectorAll('[data-rm-portfolio]').forEach(b=>b.addEventListener('click',()=>{editPortfolio.splice(Number(b.dataset.rmPortfolio),1);renderPortfolioEditor();}));
   $('#becomeForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const skills=[...e.target.querySelectorAll('input[name="skills"]:checked')].map(i=>i.value);const districts=[...e.target.querySelectorAll('input[name="districts"]:checked')].map(i=>i.value);try{await api('/become-worker',{method:'POST',body:JSON.stringify({bio:f.get('bio'),skills,districts,years_exp:Number(f.get('years_exp')||0),cccd_last4:f.get('cccd_last4')})});const me=await api('/me');state.user=me;localStorage.setItem('user',JSON.stringify(me));toast('Đăng ký thợ thành công!');location.hash='#/profile';}catch(err){toast(err.message);}});
   $('#chatForm')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const convoId=location.hash.split('/')[2];try{await api(`/conversations/${convoId}/messages`,{method:'POST',body:JSON.stringify({body:f.get('body')})});e.target.reset();}catch(err){toast(err.message);}});
+  // Support: char counters
+  document.querySelectorAll('.char-counter[data-for]').forEach(c=>{
+    const input=document.getElementById(c.dataset.for);if(!input)return;
+    const update=()=>{c.textContent=`${input.value.length}/${input.maxLength}`;c.style.color=input.value.length>=input.maxLength*0.95?'var(--danger)':'var(--muted)';};
+    input.addEventListener('input',update);update();
+  });
+  // Support: toggle category — urgent làm nổi banner + form
+  document.querySelectorAll('[data-cat]').forEach(b=>b.addEventListener('click',()=>{
+    $('#supportCategory').value=b.dataset.cat;
+    document.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('active',x===b));
+    const urgent=b.dataset.cat==='urgent';
+    const btn=$('.support-submit-btn');
+    if(btn)btn.textContent=urgent?'🚨 Gửi yêu cầu KHẨN CẤP':'Gửi yêu cầu hỗ trợ';
+    $('#supportBanner')?.classList.toggle('urgent-on',urgent);
+    $('.support-form')?.classList.toggle('urgent-form',urgent);
+  }));
+  // Support: submit (urgent có bước xác nhận)
+  $('#supportForm')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const f=new FormData(e.target);
+    if(!String(f.get('subject')).trim()||!String(f.get('message')).trim()){toast('Vui lòng nhập tiêu đề và mô tả');return;}
+    const urgent=f.get('category')==='urgent';
+    if(urgent&&!confirm('Gửi yêu cầu HỖ TRỢ KHẨN CẤP?\nAdmin sẽ nhận thông báo ngay lập tức.'))return;
+    const btn=e.target.querySelector('.support-submit-btn');btn.disabled=true;btn.textContent='Đang gửi…';
+    try{
+      await api('/support',{method:'POST',body:JSON.stringify({category:f.get('category'),subject:f.get('subject'),message:f.get('message'),contact_phone:f.get('contact_phone')||''})});
+      toast(urgent?'🚨 Đã gửi! Admin sẽ liên hệ ngay.':'Đã gửi yêu cầu hỗ trợ.');
+      renderRoute();
+    }catch(err){toast(err.message);btn.disabled=false;btn.textContent=urgent?'🚨 Gửi yêu cầu KHẨN CẤP':'Gửi yêu cầu hỗ trợ';}
+  });
   // Event delegation for dynamic buttons
   $('#app').onclick=async e=>{
     const t=e.target.closest('[data-phone]');if(t){$('#loginForm input[name="phone"]').value=t.dataset.phone;$('#loginForm input[name="password"]').value='fixnhanh123';return;}

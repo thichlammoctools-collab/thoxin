@@ -837,6 +837,65 @@ app.post('/admin/payouts/run', async (c) => {
   return c.json({ date, ...result });
 });
 
+// ==================== SUPPORT / HỖ TRẠ KHẨN CẤP ====================
+
+// Tạo yêu cầu hỗ trợ; category 'urgent' → thông báo ngay cho toàn bộ admin
+app.post('/support', async (c) => {
+  const user = await getAuthUser(c);
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  const body = await c.req.json<{ category?: string; subject?: string; message?: string; contact_phone?: string }>();
+  const category = body.category === 'urgent' ? 'urgent' : 'general';
+  const subject = String(body.subject || '').trim().slice(0, 200);
+  const message = String(body.message || '').trim().slice(0, 3000);
+  if (!subject || !message) return c.json({ error: 'Missing subject or message' }, 400);
+  const id = genId('spt');
+  await c.env.DB.prepare('INSERT INTO support_tickets (id, user_id, category, subject, message, contact_phone) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(id, user.id, category, subject, message, String(body.contact_phone || user.phone).slice(0, 20)).run();
+  // Fan-out thông báo cho admin — urgent đánh dấu khẩn để xử lý ngay
+  const admins = await c.env.DB.prepare("SELECT id FROM users WHERE role = 'admin' AND status = 'active'").all();
+  for (const a of rows(admins) as any[]) {
+    await c.env.DB.prepare('INSERT INTO notifications (id, user_id, type, title, body, payload) VALUES (?, ?, "support", ?, ?, ?)')
+      .bind(genId('notif'), a.id,
+        category === 'urgent' ? '🔴 HỖ TRỢ KHẨN CẤP' : 'Có yêu cầu hỗ trợ mới',
+        `${user.name} (${user.phone}): ${subject}`,
+        JSON.stringify({ ticket_id: id, category })
+      ).run();
+  }
+  return c.json({ id, category }, 201);
+});
+
+// Người dùng xem các ticket của mình
+app.get('/support', async (c) => {
+  const user = await getAuthUser(c);
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  const tickets = await c.env.DB.prepare('SELECT id, category, subject, message, status, created_at, resolved_at FROM support_tickets WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(user.id).all();
+  return c.json(rows(tickets));
+});
+
+// Admin: danh sách ticket (mặc định open trước)
+app.get('/admin/support', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
+  const status = c.req.query('status');
+  if (status && !['open', 'resolved'].includes(status)) return c.json({ error: 'Invalid status' }, 400);
+  let q = `SELECT s.*, u.name as user_name, u.phone as user_phone FROM support_tickets s JOIN users u ON u.id = s.user_id`;
+  const args: any[] = [];
+  if (status) { q += ' WHERE s.status = ?'; args.push(status); }
+  q += ` ORDER BY CASE WHEN s.status = 'open' THEN 0 ELSE 1 END, CASE s.category WHEN 'urgent' THEN 0 ELSE 1 END, s.created_at DESC LIMIT 100`;
+  return c.json(rows(await c.env.DB.prepare(q).bind(...args).all()));
+});
+
+// Admin: đánh dấu đã xử lý
+app.post('/admin/support/:id/resolve', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth.error) return auth.error;
+  const id = c.req.param('id');
+  const ticket = await c.env.DB.prepare('SELECT id FROM support_tickets WHERE id = ?').bind(id).first();
+  if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+  await c.env.DB.prepare("UPDATE support_tickets SET status = 'resolved', resolved_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+  return c.json({ ok: true, id, status: 'resolved' });
+});
+
 // ==================== DEV SEED ====================
 
 app.post('/_dev/seed', async (c) => {

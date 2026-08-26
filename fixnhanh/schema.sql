@@ -168,6 +168,18 @@ CREATE TABLE IF NOT EXISTS payouts (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   paid_at TEXT
 );
+-- Yêu cầu hỗ trợ từ người dùng; category 'urgent' là hỗ trợ khẩn cấp (sự cố tại chỗ, an toàn...)
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  category TEXT NOT NULL DEFAULT 'general' CHECK(category IN ('general','urgent')),
+  subject TEXT NOT NULL,
+  message TEXT NOT NULL,
+  contact_phone TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','resolved')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  resolved_at TEXT
+);
 CREATE INDEX idx_bookings_customer ON bookings(customer_id, created_at DESC);
 CREATE INDEX idx_bookings_worker ON bookings(worker_id, created_at DESC);
 CREATE INDEX idx_jobs_status ON jobs(status, created_at DESC);

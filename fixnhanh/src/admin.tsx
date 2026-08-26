@@ -98,6 +98,7 @@ button{min-height:44px}
     <span class="pager-btns"><button id="prev" type="button">← Trước</button><button id="next" type="button">Sau →</button></span>
   </div>
 </section>
+<section class="panel"><div class="toolbar"><div><h2 style="margin:0">Hỗ trợ khách hàng <span id="supportUrgentBadge" class="badge active" style="display:none;background:var(--red);color:#fff;margin-left:6px;vertical-align:middle">0 khẩn</span></h2><div id="supportCount" class="muted"></div></div><select id="supportStatus"><option value="">Tất cả</option><option value="open">Đang mở</option><option value="resolved">Đã xử lý</option></select></div><div id="supportList" aria-live="polite"></div></section>
 </main><script>
 (()=>{const token=localStorage.getItem('token'),me=JSON.parse(localStorage.getItem('user')||'null');let offset=0,limit=20,request=0,noticeTimer=null;
 const $=id=>document.getElementById(id);
@@ -157,5 +158,26 @@ $('logout').addEventListener('click',logout);
 $('role').addEventListener('change',()=>{offset=0;loadUsers()});
 $('prev').addEventListener('click',()=>{offset=Math.max(0,offset-limit);loadUsers()});
 $('next').addEventListener('click',()=>{offset+=limit;loadUsers()});
-loadStats();loadUsers()})();
+function relTime(iso){const s=(Date.now()-new Date(iso).getTime())/1000;if(!isFinite(s))return '';if(s<60)return 'Vừa xong';if(s<3600)return Math.floor(s/60)+' phút trước';if(s<86400)return Math.floor(s/3600)+' giờ trước';return new Date(iso).toLocaleString('vi-VN')}
+async function loadSupport(){const box=$('supportList');if(!box)return;const st=$('supportStatus').value;
+box.innerHTML='<div class="sk-row skeleton"></div>'.repeat(3);
+try{const q=new URLSearchParams();if(st)q.set('status',st);const list=await api('/admin/support?'+q.toString());
+if(box.id!=='supportList')return;
+const urgentOpen=list.filter(t=>t.category==='urgent'&&t.status==='open').length;
+const badge=$('supportUrgentBadge');
+if(badge){badge.style.display=urgentOpen?'':'none';badge.textContent=urgentOpen+' khẩn'}
+$('supportCount').textContent=list.length+' yêu cầu'+(st==='open'?' đang mở':'');
+if(!list.length){box.innerHTML='<div class="empty"><span class="face">✅</span>Không có yêu cầu hỗ trợ nào.</div>';return}
+box.innerHTML='<div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">'+list.map(t=>{
+const urgent=t.category==='urgent';
+return '<details class="card" style="padding:12px;border-left:3px solid '+(urgent?'var(--red)':'var(--line)')+'"'+(urgent&&t.status==='open'?' open':'')+'><summary style="display:flex;justify-content:space-between;gap:12px;align-items:center;cursor:pointer;list-style:none"><span style="min-width:0;font-weight:750">'+(urgent?'🔴 KHẨN — ':'')+esc(t.subject)+(urgent&&t.status==='open'?' <span class="badge" style="background:#fff0ee;color:#a33a32">chưa xử lý</span>':'')+'</span><span class="muted" style="font-size:12px;flex:none">'+relTime(t.created_at)+' ▾</span></summary><div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)"><div class="muted" style="font-size:13px">'+esc(t.user_name||'')+' · '+esc(t.user_phone||'')+'</div><div style="margin-top:6px;font-size:14px;line-height:1.5">'+esc(t.message)+'</div>'+(t.contact_phone?'<div class="muted" style="margin-top:6px">📞 Liên hệ: <b>'+esc(t.contact_phone)+'</b></div>':'')+'<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'+(t.status==='open'?'<button class="toggle" data-resolve="'+esc(t.id)+'">Đã xử lý</button>':'<span class="badge active">Đã xử lý · '+esc(relTime(t.resolved_at))+'</span>')+'</div></div></details>'}).join('')+'</div>';
+document.querySelectorAll('[data-resolve]').forEach(b=>b.addEventListener('click',async()=>{
+b.disabled=true;b.textContent='Đang lưu…';
+try{await api('/admin/support/'+b.dataset.resolve+'/resolve',{method:'POST'});notice('Đã đánh dấu xử lý.');loadSupport()}
+catch(e){notice(e.message,true);b.disabled=false;b.textContent='Đã xử lý'}
+}))}
+catch(e){box.innerHTML='<div class="empty"><span class="face">⚠️</span>Không tải được danh sách hỗ trợ. <button class="toggle" id="supportRetry">Thử lại</button></div>';const rb=$('supportRetry');if(rb)rb.addEventListener('click',loadSupport)}}
+$('supportStatus').addEventListener('change',loadSupport);
+setInterval(()=>{const st=$('supportStatus').value;if($('supportList')&&!document.querySelector('[data-resolve]:disabled'))loadSupport()},60000);
+loadStats();loadUsers();loadSupport()})();
 </script></body></html>`));
